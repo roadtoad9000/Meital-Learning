@@ -74,7 +74,8 @@ button, .btn, .mc-choice, .nav-btn, .ring-card, .squishy, .squish-mascot, input 
   flex-wrap: wrap; gap: 12px;
   padding: max(18px, env(safe-area-inset-top)) 4px 10px;
 }
-.brand { display: flex; align-items: center; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; cursor: pointer; border-radius: var(--radius-sm); }
+.brand:hover .brand-title { color: var(--accent); }
 .brand-emoji { font-size: 2rem; }
 .brand-title { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.02em; }
 .brand-sub { font-size: 0.8rem; color: var(--text-soft); margin-top: -2px; }
@@ -236,6 +237,33 @@ input[type="text"], input[type="number"] { font-family: inherit; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 .parent-gate { text-align: center; padding: 40px 20px; }
+
+.callout-card { border: 2px dashed var(--warn); }
+.callout-card h3 { margin-bottom: 4px; }
+
+/* ---------- learner profiles ---------- */
+.profile-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px; margin-top: 18px;
+}
+.profile-card {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 20px 12px; border-radius: var(--radius);
+  border: 2px solid var(--border); background: var(--card); color: var(--text);
+  cursor: pointer; font-family: inherit; transition: transform .12s ease, border-color .12s ease;
+}
+.profile-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+.profile-card.add { border-style: dashed; }
+.profile-avatar { font-size: 2.4rem; line-height: 1.1; }
+.profile-name { font-weight: 800; font-size: 1rem; }
+.profile-sub { font-size: 0.72rem; color: var(--text-soft); }
+
+.stat-chip.learner {
+  font-family: inherit; cursor: pointer; color: var(--text);
+  border: 1px solid var(--accent);
+}
+.stat-chip.learner .swap { opacity: 0.5; font-size: 0.8rem; }
+.stat-chip.learner:hover { background: rgba(124, 92, 255, 0.10); }
 
 /* ---------- teaching: lessons, worked examples, hints ---------- */
 .callout {

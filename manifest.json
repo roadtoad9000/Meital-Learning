@@ -1,7 +1,7 @@
 {
-  "name": "Meital's Math Quest",
+  "name": "Math Quest",
   "short_name": "Math Quest",
-  "description": "Adaptive, mastery-based Grade 7 math practice",
+  "description": "Adaptive, mastery-based math tutoring for grades 4-7",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

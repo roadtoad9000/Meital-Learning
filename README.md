@@ -1,6 +1,6 @@
-# Meital's Math Quest 🧮
+# Math Quest 🧮
 
-An adaptive, mastery-based math tutor for Meital, modeled on the
+An adaptive, mastery-based math tutor for any learner in grades 4-7, modeled on the
 [Alpha School](https://alpha.school) learning methodology and aligned to the
 [Massachusetts Curriculum Framework for Mathematics](https://www.doe.mass.edu/frameworks/current.html).
 
@@ -10,6 +10,22 @@ asked.
 
 No install, no account, no server. A single static web app that runs entirely in
 the browser and saves progress on the device.
+
+## Multiple learners
+
+On first launch it asks for a name and creates a profile. Each learner gets
+**completely separate** progress — their own placement, mastery, points, streak,
+badges and rewards. Nothing is shared between profiles.
+
+- With **one** learner, the app opens straight into their account.
+- With **two or more**, it opens a "Who's learning?" picker — good for a shared
+  classroom iPad.
+- Switch anytime via the learner chip in the top-right corner.
+- Add, rename and delete learners in **Parent Zone → Learners on this device**.
+
+Profiles are stored per device/browser, so a teacher's iPad and a student's own
+iPad each keep their own set. Student work never leaves the device it's on — a
+deliberate choice, since it means no accounts and no student data collection.
 
 ## The core idea: find the real gaps, then fill them
 
@@ -64,17 +80,17 @@ never repeats exactly.
 - **Daily streak** 🔥 for practicing on consecutive days.
 - **17 badges** — strand champions, "Grade 5/6/7 Cleared", Comeback Kid (mastering
   something missed on placement), and more.
-- **🧸 Squish Collection** — mastering a level earns a collectible squishy (she's
-  deep in a Nee Doh phase). Tap them; they squish.
+- **🧸 Squish Collection** — mastering a level earns a collectible squishy.
+  Tap them; they squish.
 - **Rewards Shop** — points buy real-world rewards a parent configures.
 
 ## For parents
 
-**Parent Zone → "Where She Actually Is"** shows the **knowledge grade** per strand:
+**Parent Zone → "Where [name] Actually Is"** shows the **knowledge grade** per strand:
 the highest grade fully mastered. Anything below Grade 7 is a real gap the app is
 actively teaching. Below that, a per-level table with status, attempts and accuracy.
 
-Also in Parent Zone: add/remove rewards, mark redemptions fulfilled, set the daily
+Also in Parent Zone: manage learners, add/remove rewards, mark redemptions fulfilled, set the daily
 goal, back up/restore progress, and reset.
 
 ## Running it on iPad / iPhone
@@ -105,8 +121,8 @@ offline mode only activates over HTTPS or localhost, so the LAN address won't ca
 ## Customizing
 
 - **Rewards / daily goal / reset**: Parent Zone.
-- **Moving between devices**: Parent Zone → Backup & Transfer (progress is saved
-  per-device in `localStorage`, and never leaves the device).
+- **Moving between devices**: Parent Zone → Backup & Transfer exports the *active*
+  learner's progress as a file you can restore on another device.
 - **Adding levels**: each is one entry in `js/curriculum.js` with a `lesson`
   (idea, steps, worked examples) and a `gen()` question generator. Add it to the
   right strand in ladder order and everything else — gating, placement, the map —
@@ -120,7 +136,7 @@ manifest.json       PWA manifest
 sw.js               Service worker (offline support)
 css/styles.css      All styling (light/dark, mobile-first)
 js/curriculum.js    The 33-level ladder: lessons + question generators
-js/storage.js       localStorage persistence
+js/storage.js       Learner profiles + localStorage persistence
 js/engine.js        Placement search, prerequisite gating, mastery, points, badges
 js/ui.js            Lesson view, practice flow, dashboard, map, parent zone
 js/main.js          Bootstrap

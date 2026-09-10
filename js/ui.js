@@ -19,11 +19,17 @@
   function save() { Storage.save(state); updateHeaderStats(); }
 
   function updateHeaderStats() {
+    if (!state) { headerStatsEl.innerHTML = ''; return; }
+    var p = Storage.getActiveProfile();
     var t = Engine.titleFor(state.lifetimePoints);
     headerStatsEl.innerHTML =
+      '<button class="stat-chip learner" id="switch-learner" title="Switch learner">' +
+      '<span>' + (p ? p.avatar : '🙂') + '</span><span class="num">' + esc(state.studentName) + '</span><span class="swap">⇄</span></button>' +
       '<div class="stat-chip level"><span>' + t.emoji + '</span><span class="num">' + esc(t.title) + '</span></div>' +
       '<div class="stat-chip points"><span>💎</span><span class="num">' + state.points.toLocaleString() + '</span></div>' +
       '<div class="stat-chip streak"><span>🔥</span><span class="num">' + state.streak.current + '-day streak</span></div>';
+    var sw = $('#switch-learner');
+    if (sw) sw.addEventListener('click', function () { renderProfilePicker(); });
   }
 
   function toast(msg) {
@@ -81,6 +87,66 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  // ---------- learner profiles ----------
+  function enterApp() {
+    state = Storage.load();
+    if (!state) return renderProfilePicker();
+    updateHeaderStats();
+    if (!state.diagnosticDone) renderWelcome(); else renderDashboard();
+  }
+
+  function renderProfilePicker() {
+    hideNav();
+    var profiles = Storage.listProfiles();
+    var cards = profiles.map(function (p) {
+      var s = Storage.profileSummary(p.id);
+      var sub = s.placed ? (s.mastered + ' / ' + s.total + ' levels · 💎 ' + s.points) : 'Not started yet';
+      return '<button class="profile-card" data-id="' + p.id + '">' +
+        '<span class="profile-avatar">' + p.avatar + '</span>' +
+        '<span class="profile-name">' + esc(p.name) + '</span>' +
+        '<span class="profile-sub">' + sub + '</span></button>';
+    }).join('');
+    mainEl.innerHTML =
+      '<div class="card center">' +
+      '<h1>Who\'s learning?</h1>' +
+      '<p class="text-soft">Each person keeps their own progress, lessons and points.</p>' +
+      '<div class="profile-grid">' + cards +
+      '<button class="profile-card add" id="add-learner"><span class="profile-avatar">➕</span><span class="profile-name">Add learner</span><span class="profile-sub">new profile</span></button>' +
+      '</div></div>';
+    $all('.profile-card[data-id]', mainEl).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        Storage.setActiveId(btn.getAttribute('data-id'));
+        enterApp();
+      });
+    });
+    $('#add-learner').addEventListener('click', function () { renderNameEntry(false); });
+  }
+
+  function renderNameEntry(isFirst) {
+    hideNav();
+    mainEl.innerHTML =
+      '<div class="card center">' +
+      '<div class="big-emoji">👋</div>' +
+      '<h1>' + (isFirst ? 'Welcome to Math Quest' : 'Add a learner') + '</h1>' +
+      '<p>What name should we use?</p>' +
+      '<div class="numeric-input-row" style="max-width:380px;margin:0 auto;">' +
+      '<input type="text" id="name-input" placeholder="First name" maxlength="30" autocomplete="off" />' +
+      '<button class="btn" id="name-go">Start →</button></div>' +
+      (isFirst ? '' : '<button class="btn secondary small mt-2" id="name-cancel">Cancel</button>') +
+      '</div>';
+    var input = $('#name-input');
+    function submit() {
+      var name = (input.value || '').trim();
+      if (!name) { toast('Please enter a name.'); input.focus(); return; }
+      Storage.createProfile(name);
+      enterApp();
+    }
+    $('#name-go').addEventListener('click', submit);
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    input.focus();
+    if (!isFirst) $('#name-cancel').addEventListener('click', function () { renderProfilePicker(); });
+  }
+
   // ---------- welcome ----------
   function renderWelcome() {
     hideNav();
@@ -94,8 +160,19 @@
       '</div>' +
       '<p class="text-soft">About ' + Engine.diagnosticTotalEstimate() + ' questions, 5 minutes. If you see something you\'ve never been taught, just tap <strong>"Haven\'t learned this yet"</strong> and it moves on.</p>' +
       '<button class="btn" id="start-diag">Find My Starting Line →</button>' +
+      '<button class="btn secondary small block mt-2" id="skip-diag">Skip for now — just show me around</button>' +
       '</div>';
     $('#start-diag').addEventListener('click', startDiagnostic);
+    $('#skip-diag').addEventListener('click', skipPlacement);
+  }
+
+  /* Lets someone browse the app without sitting through placement first.
+     Everything simply starts at the bottom of each ladder until they take it. */
+  function skipPlacement() {
+    state.diagnosticDone = true;
+    state.placementSkipped = true;
+    save();
+    renderDashboard();
   }
 
   // ---------- placement ----------
@@ -118,7 +195,10 @@
       '<div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:' + pct + '%"></div></div>' +
       '<div class="question-prompt">' + esc(q.prompt) + '</div>' +
       '<div id="answer-zone"></div>' +
-      '<button class="btn secondary small mt-2" id="not-learned">🤷 Haven\'t learned this yet</button>' +
+      '<div class="quiz-actions mt-2">' +
+      '<button class="btn secondary small" id="not-learned">🤷 Haven\'t learned this yet</button>' +
+      '<button class="btn secondary small" id="skip-diag-mid">Skip placement</button>' +
+      '</div>' +
       '</div>';
 
     function proceed(correct) {
@@ -128,6 +208,7 @@
       }, 450);
     }
     renderAnswerZone(q, proceed, { mode: 'placement' });
+    $('#skip-diag-mid').addEventListener('click', skipPlacement);
     $('#not-learned').addEventListener('click', function () {
       $('#not-learned').disabled = true;
       $('#answer-zone').innerHTML = '<div class="feedback-panel neutral"><div class="feedback-title">👍 Good to know — that just tells us where to start.</div></div>';
@@ -177,6 +258,12 @@
 
     mainEl.innerHTML =
       '<div class="grid" style="gap:16px;">' +
+      (state.placementSkipped ?
+        '<div class="card callout-card">' +
+        '<h3>📍 Placement not done yet</h3>' +
+        '<p>Right now every strand starts at the very beginning (Grade 4). Take the 5-minute placement and it will skip ahead to ' + esc(state.studentName) + '\'s real starting point.</p>' +
+        '<button class="btn small" id="take-placement">Take the placement →</button>' +
+        '</div>' : '') +
       (next ?
         '<div class="card next-up">' +
         '<div class="next-label">📚 NEXT LESSON</div>' +
@@ -195,6 +282,11 @@
       squishyCollection() +
       '</div>';
 
+    if (state.placementSkipped) {
+      $('#take-placement').addEventListener('click', function () {
+        state.placementSkipped = false; save(); startDiagnostic();
+      });
+    }
     if (next) $('#start-next').addEventListener('click', function () { startLevel(next.id); });
     $all('.strand-card', mainEl).forEach(function (c) {
       c.addEventListener('click', function () {
@@ -566,8 +658,20 @@
         (r.fulfilled ? '' : '<button class="btn small success" data-ful="' + r.id + '">Mark Fulfilled</button>') + '</div>';
     }).join('') || '<p class="text-soft">None yet.</p>';
 
+    var activeId = Storage.getActiveId();
+    var learnerRows = Storage.listProfiles().map(function (p) {
+      var s = Storage.profileSummary(p.id);
+      return '<div class="form-row" style="align-items:center;">' +
+        '<span style="flex:1;">' + p.avatar + ' <strong>' + esc(p.name) + '</strong>' +
+        (p.id === activeId ? ' <span class="grade-chip">active</span>' : '') +
+        ' <span class="text-soft">— ' + (s.placed ? s.mastered + '/' + s.total + ' levels, 💎 ' + s.points : 'not started') + '</span></span>' +
+        '<button class="btn small secondary" data-rename="' + p.id + '">Rename</button>' +
+        '<button class="btn small danger" data-delprofile="' + p.id + '">Delete</button>' +
+        '</div>';
+    }).join('');
+
     mainEl.innerHTML =
-      '<div class="card"><h2>📊 Where She Actually Is</h2>' +
+      '<div class="card"><h2>📊 Where ' + esc(state.studentName) + ' Actually Is</h2>' +
       '<p>"Knowledge grade" is the highest grade level fully mastered in that strand. Anything below Grade 7 is a gap the app is actively teaching.</p>' +
       '<div style="overflow-x:auto"><table class="report"><thead><tr><th>Strand</th><th>Knowledge grade</th><th>Mastered</th><th>Currently teaching</th></tr></thead><tbody>' + gapRows + '</tbody></table></div></div>' +
 
@@ -584,7 +688,15 @@
       '<div class="form-row"><button class="btn small" id="export">⬇️ Download Backup</button>' +
       '<label class="btn small secondary" for="import" style="cursor:pointer;">⬆️ Restore<input type="file" id="import" accept="application/json" style="display:none;"></label></div></div>' +
 
-      '<div class="card mt-2"><h3>Danger Zone</h3><p class="text-soft">Clears all progress and re-runs placement.</p><button class="btn danger" id="reset">Reset All Progress</button></div>';
+      '<div class="card mt-2"><h3>Placement</h3><p class="text-soft">Re-running placement can only unlock levels, never take mastered ones away. Useful after a break, or if the first run did not reflect what they know.</p>' +
+      '<button class="btn small" id="retake-placement">Run placement for ' + esc(state.studentName) + '</button></div>' +
+
+      '<div class="card mt-2"><h3>Learners on this device</h3>' +
+      '<p class="text-soft">Each learner has completely separate progress, placement and points. Nothing is shared between them, and nothing leaves this device.</p>' +
+      learnerRows +
+      '<button class="btn small mt-1" id="add-learner-parent">➕ Add a learner</button></div>' +
+
+      '<div class="card mt-2"><h3>Danger Zone</h3><p class="text-soft">Clears progress for <strong>' + esc(state.studentName) + '</strong> only and re-runs their placement.</p><button class="btn danger" id="reset">Reset ' + esc(state.studentName) + '\'s Progress</button></div>';
 
     $('#rw-add').addEventListener('click', function () {
       var n = $('#rw-name').value.trim(), c = parseInt($('#rw-cost').value, 10);
@@ -633,8 +745,36 @@
       };
       reader.readAsText(f);
     });
+    $('#retake-placement').addEventListener('click', function () {
+      state.placementSkipped = false; save(); startDiagnostic();
+    });
+    $('#add-learner-parent').addEventListener('click', function () { renderNameEntry(false); });
+    $all('[data-rename]', mainEl).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-rename');
+        var p = Storage.listProfiles().find(function (x) { return x.id === id; });
+        var name = prompt('New name for ' + p.name + ':', p.name);
+        if (name && name.trim()) {
+          Storage.renameProfile(id, name);
+          if (id === Storage.getActiveId()) { state.studentName = name.trim(); save(); }
+          renderParentPanel();
+        }
+      });
+    });
+    $all('[data-delprofile]', mainEl).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-delprofile');
+        var p = Storage.listProfiles().find(function (x) { return x.id === id; });
+        if (!confirm('Delete ' + p.name + ' and all of their progress? This cannot be undone.')) return;
+        Storage.deleteProfile(id);
+        var remaining = Storage.listProfiles();
+        if (!remaining.length) return renderNameEntry(true);
+        if (id === activeId) { Storage.setActiveId(remaining[0].id); return enterApp(); }
+        renderParentPanel();
+      });
+    });
     $('#reset').addEventListener('click', function () {
-      if (confirm('Reset ALL progress? This cannot be undone.')) {
+      if (confirm('Reset ' + state.studentName + '\'s progress? This cannot be undone.')) {
         state = Storage.reset(); save(); renderWelcome();
       }
     });
@@ -643,16 +783,33 @@
   // ---------- init ----------
   function init() {
     mainEl = $('#app-main'); navEl = $('#app-nav'); headerStatsEl = $('#header-stats');
-    state = Storage.load();
-    updateHeaderStats();
     var mascot = $('#squish-mascot');
     if (mascot) {
-      mascot.addEventListener('click', function () {
+      mascot.addEventListener('click', function (e) {
+        e.stopPropagation(); // the mascot sits inside the clickable brand
         mascot.classList.remove('squish-pop'); void mascot.offsetWidth; mascot.classList.add('squish-pop');
         toast(BOOPS[Math.floor(Math.random() * BOOPS.length)]);
       });
     }
-    if (!state.diagnosticDone) renderWelcome(); else renderDashboard();
+    // Clicking the logo always returns to the dashboard, from any screen.
+    var brand = $('#go-home');
+    if (brand) {
+      brand.addEventListener('click', function () {
+        if (!state) return;
+        if (!state.diagnosticDone) skipPlacement(); else go('dashboard');
+      });
+    }
+
+    Storage.migrateLegacy();
+    var profiles = Storage.listProfiles();
+    if (!profiles.length) return renderNameEntry(true);
+
+    // One learner: go straight in. Several (a shared iPad): ask who it is.
+    if (profiles.length === 1) {
+      Storage.setActiveId(profiles[0].id);
+      return enterApp();
+    }
+    renderProfilePicker();
   }
 
   root.App = root.App || {};

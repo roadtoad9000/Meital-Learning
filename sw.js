@@ -1,6 +1,6 @@
-/* Service worker: caches the app shell so Meital's Math Quest works offline
+/* Service worker: caches the app shell so Math Quest works offline
    once loaded (no wifi needed on the go). Stale-while-revalidate strategy. */
-var CACHE_NAME = 'meital-math-quest-v2';
+var CACHE_NAME = 'math-quest-v3';
 var APP_SHELL = [
   './',
   './index.html',
