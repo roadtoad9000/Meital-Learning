@@ -472,6 +472,9 @@
       '<div class="card mt-2"><h2>Daily Goal</h2>' +
       '<div class="form-row"><label>Sprints per day: <input type="number" id="daily-target" value="' + state.dailyGoal.target + '" min="1" max="10" style="width:60px;"></label><button class="btn small" id="save-goal-btn">Save</button></div>' +
       '</div>' +
+      '<div class="card mt-2"><h2>Backup & Transfer</h2><p class="text-soft">Progress is saved only on this device/browser. Download a backup to move it to another iPad or iPhone, or just to keep a safety copy.</p>' +
+      '<div class="form-row"><button class="btn small" id="export-btn">⬇️ Download Backup</button><label class="btn small secondary" for="import-file" style="cursor:pointer;">⬆️ Restore From Backup<input type="file" id="import-file" accept="application/json" style="display:none;"></label></div>' +
+      '</div>' +
       '<div class="card mt-2"><h2>Danger Zone</h2><p class="text-soft">This clears all progress, points, and badges. Cannot be undone.</p><button class="btn danger" id="reset-btn">Reset All Progress</button></div>';
 
     $('#add-reward-btn').addEventListener('click', function () {
@@ -504,6 +507,39 @@
         saveState();
         renderWelcome();
       }
+    });
+    $('#export-btn').addEventListener('click', function () {
+      var data = JSON.stringify(state, null, 2);
+      var blob = new Blob([data], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'meital-math-quest-backup-' + Storage.todayStr() + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      toast('Backup downloaded.');
+    });
+    $('#import-file').addEventListener('change', function (e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        try {
+          var imported = JSON.parse(reader.result);
+          if (!imported || typeof imported !== 'object' || !imported.skills) throw new Error('Not a valid backup file.');
+          if (!confirm('Replace current progress with this backup? This cannot be undone.')) return;
+          state = imported;
+          saveState();
+          renderParentPanel();
+          toast('Backup restored.');
+        } catch (err) {
+          toast('Could not read that backup file.');
+        }
+        e.target.value = '';
+      };
+      reader.readAsText(file);
     });
   }
 

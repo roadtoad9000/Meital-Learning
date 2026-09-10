@@ -58,21 +58,49 @@ bank), so practice is effectively unlimited and never repeats exactly.
   badge, streak badges, a "Perfect Sprint" badge, and a "Comeback Kid" badge for
   mastering something that was wrong on the placement quiz.
 
-## Running it
+## Running it on iPad / iPhone
 
-Just open `index.html` in a browser — everything (HTML/CSS/vanilla JS) is
-self-contained with no build step and no external dependencies. To host it
-somewhere shareable (e.g. so Meital can use it on her own device), enable
-**GitHub Pages** for this repo (Settings → Pages → deploy from the default
-branch), or serve the folder with any static file server:
+The app is a installable **Progressive Web App** — it works fully offline once
+loaded, gets its own home screen icon, and opens full-screen (no Safari
+address bar) just like a native app.
+
+1. **Host it somewhere Safari can reach.** Easiest option: enable **GitHub
+   Pages** for this repo — go to the repo's **Settings → Pages**, and under
+   "Build and deployment" choose **Deploy from a branch**, then pick this
+   branch (`claude/meital-math-learning-app-zc6yuo`, or `main` if/once this is
+   merged) and the `/ (root)` folder. Save. GitHub gives you a URL like
+   `https://<username>.github.io/<repo>/` — that's the link Meital opens on
+   her device. (This one step needs a human with repo access — it can't be
+   done from here.)
+2. **On her iPad/iPhone**, open that URL in **Safari** (must be Safari, not
+   Chrome, for the "Add to Home Screen" install step to work).
+3. Tap the **Share** icon (square with an arrow) → **Add to Home Screen** →
+   **Add**. A "Math Quest" icon now sits on her home screen and opens full
+   screen, like any other app.
+4. After the first visit, it keeps working **without wifi or data** — every
+   file is cached locally, so it's fine in the car, on a plane, or anywhere
+   with spotty signal.
+
+You can also just open the hosted URL in mobile Safari directly without
+installing it — it works the same either way, installing just makes it feel
+more like a real app and skips the browser chrome.
+
+## Running it locally / on desktop
+
+Everything (HTML/CSS/vanilla JS) is self-contained with no build step and no
+external dependencies. Just open `index.html` in a browser, or serve the
+folder with any static file server:
 
 ```bash
 python3 -m http.server 8080
 # then open http://localhost:8080
 ```
 
-Progress is saved in the browser's `localStorage`, scoped to whatever device
-and browser it's opened in — no login, no backend, no data leaves the device.
+Progress is saved in the browser's `localStorage`, scoped to whatever
+device/browser it's opened in — no login, no backend, no data leaves the
+device. If Meital uses more than one device (say, her iPad at home and an
+iPhone out and about), use **Parent Zone → Backup & Transfer** to download a
+backup on one device and restore it on the other to bring progress along.
 
 ## Customizing
 
