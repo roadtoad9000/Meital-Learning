@@ -194,6 +194,7 @@
       '<div class="quiz-meta"><span>' + strand.emoji + ' ' + esc(strand.name) + '</span>' + gradeChip(level.grade) + '</div>' +
       '<div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:' + pct + '%"></div></div>' +
       '<div class="question-prompt">' + esc(q.prompt) + '</div>' +
+      (q.visual || '') +
       '<div id="answer-zone"></div>' +
       '<div class="quiz-actions mt-2">' +
       '<button class="btn secondary small" id="not-learned">🤷 Haven\'t learned this yet</button>' +
@@ -300,7 +301,7 @@
   // ---------- LESSON ----------
   function startLevel(levelId) {
     var ls = state.levels[levelId];
-    session = { levelId: levelId, asked: 0, correct: 0, pointsEarned: 0, combo: 0, mastered: false, missed: false, guidedLeft: Engine.GUIDED_COUNT };
+    session = { levelId: levelId, asked: 0, correct: 0, unaidedCorrect: 0, pointsEarned: 0, combo: 0, mastered: false, missed: false, guidedLeft: Engine.GUIDED_COUNT, usedHelp: false, photos: [] };
     if (!ls.lessonSeen) renderLesson(levelId, 0);
     else renderQuestion();
   }
@@ -324,6 +325,7 @@
       '<h1>' + esc(lv.name) + '</h1>' +
 
       '<div class="lesson-idea"><div class="lesson-h">💡 The idea</div><p>' + esc(lv.lesson.idea) + '</p></div>' +
+      (lv.lesson.visual || '') +
 
       '<div class="lesson-h mt-2">📋 How to do it</div>' +
       '<ol class="method-list">' + lv.lesson.steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' +
@@ -366,6 +368,7 @@
     var strand = Engine.STRAND_MAP[lv.strand];
     var q = Engine.questionFor(levelId);
     var guided = session.guidedLeft > 0;
+    session.usedHelp = false;
 
     var pips = '';
     for (var i = 0; i < Engine.MASTERY_STREAK; i++) {
@@ -380,13 +383,18 @@
       gradeChip(lv.grade) +
       '</div>' +
       '<div class="mastery-track"><span class="mastery-label">' + ls.streak + ' / ' + Engine.MASTERY_STREAK + ' in a row to master</span><span class="pips">' + pips + '</span></div>' +
+      (session.combo >= 2 ? '<div class="combo-banner">🔥 ' + session.combo + ' in a row — ' + (session.combo >= 4 ? 'on fire!' : 'keep going!') + '</div>' : '') +
       '<div class="question-prompt">' + esc(q.prompt) + '</div>' +
+      (q.visual || '') +
       '<div id="answer-zone"></div>' +
       '<div class="quiz-actions mt-2">' +
       '<button class="btn secondary small" id="hint-btn">💡 Hint</button>' +
       '<button class="btn secondary small" id="reteach-btn">📖 Show the lesson again</button>' +
       '<button class="btn secondary small" id="stop-btn">Finish session</button>' +
+      '<label class="btn secondary small" for="work-photo" style="cursor:pointer;">📸 Show my work' +
+      '<input type="file" id="work-photo" accept="image/*" capture="environment" style="display:none;"></label>' +
       '</div>' +
+      '<div id="work-slot"></div>' +
       '<div id="hint-slot"></div>' +
       '</div>';
 
@@ -396,27 +404,44 @@
       else { session.combo = 0; session.missed = true; }
       if (session.guidedLeft > 0) session.guidedLeft -= 1;
 
-      var pts = Engine.pointsForAnswer(lv.grade, correct, session.combo);
+      var helped = !!session.usedHelp;
+      if (correct && !helped) session.unaidedCorrect += 1;
+      var pts = Engine.pointsForAnswer(lv.grade, correct, session.combo, helped);
       session.pointsEarned += pts;
       Engine.addPoints(state, pts);
 
-      var justMastered = Engine.recordAnswer(state, levelId, correct);
+      var justMastered = Engine.recordAnswer(state, levelId, correct, helped);
       if (justMastered) session.mastered = true;
       save();
 
       if (justMastered) { setTimeout(finishSession, 300); return; }
       if (session.asked >= 12) { setTimeout(finishSession, 300); return; }
       renderQuestion();
-    }, { mode: 'practice', level: lv, points: Engine.pointsForAnswer(lv.grade, true, session.combo + 1) });
+    }, { mode: 'practice', level: lv, getPoints: function () { return Engine.pointsForAnswer(lv.grade, true, session.combo + 1, !!session.usedHelp); } });
 
     $('#hint-btn').addEventListener('click', function () {
+      session.usedHelp = true;
       $('#hint-slot').innerHTML =
         '<div class="hint-panel"><div class="lesson-h">💡 Remember</div><ol class="method-list">' +
         lv.lesson.steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol></div>';
       $('#hint-btn').disabled = true;
     });
-    $('#reteach-btn').addEventListener('click', function () { renderLesson(levelId, 99); });
+    $('#reteach-btn').addEventListener('click', function () { session.usedHelp = true; renderLesson(levelId, 99); });
     $('#stop-btn').addEventListener('click', finishSession);
+    $('#work-photo').addEventListener('change', function (e) {
+      var f = e.target.files[0];
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        session.photos.push({ levelId: levelId, at: Date.now(), data: reader.result });
+        $('#work-slot').innerHTML =
+          '<div class="work-photo-preview"><img src="' + reader.result + '" alt="Photo of written work"/>' +
+          '<div class="text-soft">Saved with this session — a grown-up can see it in Parent Zone.</div></div>';
+        toast('📸 Work photo saved!');
+      };
+      reader.readAsDataURL(f);
+      e.target.value = '';
+    });
   }
 
   // ---------- answers ----------
@@ -469,7 +494,8 @@
     if (correct) {
       slot.innerHTML =
         '<div class="feedback-panel correct">' +
-        '<div class="feedback-title">✅ Correct! <span class="pts">+' + opts.points + ' 💎</span></div>' +
+        '<div class="feedback-title">✅ Correct! <span class="pts">+' + opts.getPoints() + ' 💎</span></div>' +
+        (session && session.usedHelp ? '<div class="text-soft" style="font-size:.8rem">Used a hint — this one does not count toward your ' + Engine.MASTERY_STREAK + '-in-a-row.</div>' : '') +
         '<div>' + esc(q.explanation) + '</div>' +
         '<button class="btn small mt-2" id="cont">Continue →</button>' +
         '</div>';
@@ -492,8 +518,14 @@
     var perfect = session.asked > 0 && session.correct === session.asked;
     var dailyBonus = Engine.completeSession(state, {
       levelId: session.levelId, correctCount: session.correct, total: session.asked,
+      unaidedCorrect: session.unaidedCorrect,
       pointsEarned: session.pointsEarned, mastered: session.mastered
     });
+    if (session.photos && session.photos.length) {
+      state.workPhotos = (state.workPhotos || []).concat(session.photos.map(function (ph) {
+        return { levelId: ph.levelId, date: Storage.todayStr(), data: ph.data };
+      })).slice(-12); // keep the last dozen so localStorage stays small
+    }
     var badges = Engine.checkBadges(state, {
       anyCorrect: session.correct > 0,
       newlyMastered: session.mastered ? [session.levelId] : [],
@@ -645,7 +677,7 @@
       var ls = state.levels[lv.id];
       var acc = ls.attempts ? Math.round((ls.correct / ls.attempts) * 100) + '%' : '—';
       var status = ls.masteredAt ? (ls.placedByDiagnostic ? 'Placed (already knew)' : 'Mastered') : Engine.isUnlocked(state, lv.id) ? 'Working on it' : 'Locked';
-      return '<tr><td>G' + lv.grade + '</td><td>' + esc(lv.name) + '</td><td>' + status + '</td><td>' + ls.attempts + '</td><td>' + acc + '</td></tr>';
+      return '<tr><td>G' + lv.grade + '</td><td>' + esc(lv.name) + '</td><td>' + status + '</td><td>' + ls.attempts + '</td><td>' + acc + '</td><td>' + (ls.hintedAnswers || 0) + '</td></tr>';
     }).join('');
 
     var rewardRows = state.rewards.map(function (r) {
@@ -675,7 +707,7 @@
       '<p>"Knowledge grade" is the highest grade level fully mastered in that strand. Anything below Grade 7 is a gap the app is actively teaching.</p>' +
       '<div style="overflow-x:auto"><table class="report"><thead><tr><th>Strand</th><th>Knowledge grade</th><th>Mastered</th><th>Currently teaching</th></tr></thead><tbody>' + gapRows + '</tbody></table></div></div>' +
 
-      '<div class="card mt-2"><h3>Every Level</h3><div style="overflow-x:auto"><table class="report"><thead><tr><th>Gr</th><th>Level</th><th>Status</th><th>Tries</th><th>Accuracy</th></tr></thead><tbody>' + detail + '</tbody></table></div></div>' +
+      '<div class="card mt-2"><h3>Every Level</h3><div style="overflow-x:auto"><table class="report"><thead><tr><th>Gr</th><th>Level</th><th>Status</th><th>Tries</th><th>Accuracy</th><th>With hint</th></tr></thead><tbody>' + detail + '</tbody></table></div></div>' +
 
       '<div class="card mt-2"><h3>Rewards</h3>' +
       '<div class="form-row"><input type="text" id="rw-name" placeholder="Reward name" style="flex:2;"><input type="number" id="rw-cost" placeholder="Points" style="flex:1;"><button class="btn" id="rw-add">Add</button></div>' + rewardRows + '</div>' +
@@ -687,6 +719,15 @@
       '<div class="card mt-2"><h3>Backup & Transfer</h3><p class="text-soft">Progress saves on this device only. Move it between her iPad and iPhone here.</p>' +
       '<div class="form-row"><button class="btn small" id="export">⬇️ Download Backup</button>' +
       '<label class="btn small secondary" for="import" style="cursor:pointer;">⬆️ Restore<input type="file" id="import" accept="application/json" style="display:none;"></label></div></div>' +
+
+      (state.workPhotos && state.workPhotos.length ?
+        '<div class="card mt-2"><h3>📸 Written work submitted</h3>' +
+        '<p class="text-soft">Photos ' + esc(state.studentName) + ' chose to attach while practising. Useful for checking the working was actually done, not just the answer typed.</p>' +
+        '<div class="work-gallery">' + state.workPhotos.slice().reverse().map(function (w) {
+          var lv = Engine.LEVEL_MAP[w.levelId];
+          return '<figure><img src="' + w.data + '" alt="student work"/><figcaption>' + esc(lv ? lv.name : w.levelId) + ' · ' + esc(w.date) + '</figcaption></figure>';
+        }).join('') + '</div>' +
+        '<button class="btn small danger mt-1" id="clear-photos">Clear photos</button></div>' : '') +
 
       '<div class="card mt-2"><h3>Placement</h3><p class="text-soft">Re-running placement can only unlock levels, never take mastered ones away. Useful after a break, or if the first run did not reflect what they know.</p>' +
       '<button class="btn small" id="retake-placement">Run placement for ' + esc(state.studentName) + '</button></div>' +
@@ -745,6 +786,12 @@
       };
       reader.readAsText(f);
     });
+    if ($('#clear-photos')) {
+      $('#clear-photos').addEventListener('click', function () {
+        if (!confirm('Delete all saved work photos?')) return;
+        state.workPhotos = []; save(); renderParentPanel();
+      });
+    }
     $('#retake-placement').addEventListener('click', function () {
       state.placementSkipped = false; save(); startDiagnostic();
     });

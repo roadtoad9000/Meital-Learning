@@ -4,6 +4,7 @@
    and the diagnostic walks DOWN a chain to find where a student's real knowledge ends. */
 (function (root) {
   var PI = 3.14;
+  var V = root.App.Visuals;
 
   // ---------- shared helpers ----------
   function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -62,8 +63,15 @@
       gen: function () {
         var a = randInt(12, 89), b = randInt(3, 9);
         var tens = Math.floor(a / 10) * 10, ones = a % 10;
-        return num(a + ' × ' + b + ' = ?', a * b,
+        var qmul = num(a + ' × ' + b + ' = ?', a * b,
           'Break ' + a + ' into ' + tens + ' + ' + ones + '. ' + b + ' × ' + ones + ' = ' + (b * ones) + ', and ' + b + ' × ' + tens + ' = ' + (b * tens) + '. Add: ' + (b * tens) + ' + ' + (b * ones) + ' = ' + (a * b) + '.', 0.001);
+        qmul.visual = V.areaModel(a, b, {
+          split: [tens, ones],
+          leftLabel: String(b * tens),
+          rightLabel: String(b * ones),
+          caption: 'Split ' + a + ' into ' + tens + ' + ' + ones + ', multiply each piece, then add'
+        });
+        return qmul;
       }
     },
     {
@@ -109,6 +117,10 @@
         var correct = fracStr(base[0], base[1]);
         return Object.assign(makeMC(correct, [fracStr(base[0] + 1, base[1]), fracStr(base[1], base[0]), fracStr(n - 1, d)]), {
           prompt: 'Write ' + fracStr(n, d) + ' in simplest form.',
+          visual: V.fractionBars([
+            { num: n, den: d, label: fracStr(n, d) },
+            { num: base[0], den: base[1], label: fracStr(base[0], base[1]), color: 'var(--viz-fill-b)' }
+          ], 'Same amount shaded — just cut into bigger pieces'),
           explanation: 'Both ' + n + ' and ' + d + ' divide by ' + k + '. ' + n + ' ÷ ' + k + ' = ' + base[0] + ' and ' + d + ' ÷ ' + k + ' = ' + base[1] + ', so ' + fracStr(n, d) + ' = ' + correct + '.'
         });
       }
@@ -134,9 +146,14 @@
         var n1 = randInt(1, d1 - 1 || 1), n2 = randInt(1, d2 - 1 || 1);
         var rn = n1 * d2 + n2 * d1, rd = d1 * d2;
         var s = simplifyFrac(rn, rd);
-        return num(fracStr(n1, d1) + ' + ' + fracStr(n2, d2) + ' = ?  (answer as a decimal, rounded to 2 places)',
+        var q = num(fracStr(n1, d1) + ' + ' + fracStr(n2, d2) + ' = ?  (answer as a decimal, rounded to 2 places)',
           round2(s[0] / s[1]),
           'Common denominator is ' + rd + ': ' + fracStr(n1 * d2, rd) + ' + ' + fracStr(n2 * d1, rd) + ' = ' + fracStr(rn, rd) + ' = ' + fracStr(s[0], s[1]) + ' = ' + round2(s[0] / s[1]) + '.', 0.02);
+        q.visual = V.fractionBars([
+          { num: n1, den: d1, label: fracStr(n1, d1) },
+          { num: n2, den: d2, label: fracStr(n2, d2), color: 'var(--viz-fill-b)' }
+        ], 'How much is shaded altogether?');
+        return q;
       }
     },
     {
@@ -154,9 +171,14 @@
         var d1 = randChoice([2, 3, 4, 5, 6]), d2 = randChoice([2, 3, 4, 5, 6]);
         var n1 = randInt(1, d1 - 1 || 1), n2 = randInt(1, d2 - 1 || 1);
         var s = simplifyFrac(n1 * n2, d1 * d2);
-        return num(fracStr(n1, d1) + ' × ' + fracStr(n2, d2) + ' = ?  (answer as a decimal, rounded to 2 places)',
+        var qm = num(fracStr(n1, d1) + ' × ' + fracStr(n2, d2) + ' = ?  (answer as a decimal, rounded to 2 places)',
           round2(s[0] / s[1]),
           'Straight across: ' + (n1 * n2) + '/' + (d1 * d2) + ' = ' + fracStr(s[0], s[1]) + ' = ' + round2(s[0] / s[1]) + '.', 0.02);
+        qm.visual = V.fractionBars([
+          { num: n1, den: d1, label: fracStr(n1, d1) },
+          { num: n2, den: d2, label: fracStr(n2, d2), color: 'var(--viz-fill-b)' }
+        ], 'Taking a part OF a part');
+        return qm;
       }
     },
     {
@@ -174,9 +196,14 @@
         var d1 = randChoice([2, 3, 4, 5, 6]), d2 = randChoice([2, 3, 4, 5]);
         var n1 = randInt(1, d1 - 1 || 1), n2 = randInt(1, d2 - 1 || 1);
         var s = simplifyFrac(n1 * d2, d1 * n2);
-        return num(fracStr(n1, d1) + ' ÷ ' + fracStr(n2, d2) + ' = ?  (answer as a decimal, rounded to 2 places)',
+        var qd = num(fracStr(n1, d1) + ' ÷ ' + fracStr(n2, d2) + ' = ?  (answer as a decimal, rounded to 2 places)',
           round2(s[0] / s[1]),
           'Flip and multiply: ' + fracStr(n1, d1) + ' × ' + fracStr(d2, n2) + ' = ' + fracStr(n1 * d2, d1 * n2) + ' = ' + fracStr(s[0], s[1]) + ' = ' + round2(s[0] / s[1]) + '.', 0.02);
+        qd.visual = V.fractionBars([
+          { num: n1, den: d1, label: 'we have ' + fracStr(n1, d1) },
+          { num: n2, den: d2, label: 'in chunks of ' + fracStr(n2, d2), color: 'var(--viz-fill-b)' }
+        ], 'How many chunks fit?');
+        return qd;
       }
     },
     {
@@ -250,7 +277,12 @@
       gen: function () {
         if (Math.random() < 0.5) {
           var a = randNonzero(-15, 15);
-          return num('What is |' + a + '|?', Math.abs(a), '|' + a + '| is the distance from 0, which is ' + Math.abs(a) + '.', 0.001);
+          var qa = num('What is |' + a + '|?', Math.abs(a), '|' + a + '| is the distance from 0, which is ' + Math.abs(a) + '.', 0.001);
+          qa.visual = V.numberLine(Math.min(a, 0) - 2, Math.max(a, 0) + 2, {
+            points: [{ at: a, label: String(a) }],
+            jump: { from: 0, to: a, label: 'how far from 0?' }
+          });
+          return qa;
         }
         var p = randInt(-12, -1), q = randInt(-12, -1);
         while (q === p) q = randInt(-12, -1);
@@ -283,8 +315,15 @@
       gen: function () {
         var a = randInt(-20, 20), b = randInt(-20, 20), op = randChoice(['+', '-']);
         var ans = op === '+' ? a + b : a - b;
-        return num(a + ' ' + op + ' (' + b + ') = ?', ans,
+        var qi = num(a + ' ' + op + ' (' + b + ') = ?', ans,
           (op === '-' ? 'Subtracting ' + b + ' is the same as adding ' + (-b) + '. ' : '') + a + ' ' + op + ' (' + b + ') = ' + ans + '.', 0.001);
+        var lo = Math.min(a, ans, 0) - 3, hi = Math.max(a, ans, 0) + 3;
+        qi.visual = V.numberLine(lo, hi, {
+          points: [{ at: a, label: 'start' }],
+          jump: { from: a, to: ans, label: (ans >= a ? 'move right' : 'move left') },
+          caption: 'Start at ' + a + ', then move along the line'
+        });
+        return qi;
       }
     },
     {
@@ -361,8 +400,10 @@
       gen: function () {
         var pct = randChoice([10, 20, 25, 50, 75, 5]);
         var whole = randChoice([20, 40, 60, 80, 100, 120, 200]);
-        return num('What is ' + pct + '% of ' + whole + '?', round2(whole * pct / 100),
+        var qpc = num('What is ' + pct + '% of ' + whole + '?', round2(whole * pct / 100),
           pct + '% = ' + (pct / 100) + '. ' + (pct / 100) + ' × ' + whole + ' = ' + round2(whole * pct / 100) + '.', 0.01);
+        qpc.visual = V.percentBar(pct, { caption: 'The whole bar is ' + whole });
+        return qpc;
       }
     },
     {
@@ -577,11 +618,15 @@
       gen: function () {
         var l = randInt(3, 15), w = randInt(3, 15);
         if (Math.random() < 0.5) {
-          return num('A rectangle is ' + l + ' cm long and ' + w + ' cm wide. What is its AREA, in cm²?',
+          var qr = num('A rectangle is ' + l + ' cm long and ' + w + ' cm wide. What is its AREA, in cm²?',
             l * w, 'Area = length × width = ' + l + ' × ' + w + ' = ' + (l * w) + ' cm².', 0.01);
+          qr.visual = V.rectShape(l, w, { grid: true, caption: 'Count the squares inside' });
+          return qr;
         }
-        return num('A rectangle is ' + l + ' cm long and ' + w + ' cm wide. What is its PERIMETER, in cm?',
+        var qp = num('A rectangle is ' + l + ' cm long and ' + w + ' cm wide. What is its PERIMETER, in cm?',
           2 * (l + w), 'Perimeter = 2 × (' + l + ' + ' + w + ') = 2 × ' + (l + w) + ' = ' + (2 * (l + w)) + ' cm.', 0.01);
+        qp.visual = V.rectShape(l, w, { caption: 'Walk all the way around the edge' });
+        return qp;
       }
     },
     {
@@ -602,8 +647,10 @@
       gen: function () {
         var b = randInt(3, 20), h = randInt(3, 20);
         if (Math.random() < 0.5) {
-          return num('A triangle has a base of ' + b + ' cm and a height of ' + h + ' cm. What is its area, in cm²?',
+          var qt = num('A triangle has a base of ' + b + ' cm and a height of ' + h + ' cm. What is its area, in cm²?',
             round2(0.5 * b * h), 'Area = ½ × ' + b + ' × ' + h + ' = ' + round2(0.5 * b * h) + ' cm².', 0.01);
+          qt.visual = V.triangleShape(b, h);
+          return qt;
         }
         return num('A parallelogram has a base of ' + b + ' cm and a height of ' + h + ' cm. What is its area, in cm²?',
           b * h, 'Area = base × height = ' + b + ' × ' + h + ' = ' + (b * h) + ' cm².', 0.01);
@@ -677,11 +724,15 @@
       gen: function () {
         var r = randInt(2, 12);
         if (Math.random() < 0.5) {
-          return num('A circle has a radius of ' + r + ' cm. Using π ≈ 3.14, what is its AREA in cm²? (2 decimal places)',
+          var qc = num('A circle has a radius of ' + r + ' cm. Using π ≈ 3.14, what is its AREA in cm²? (2 decimal places)',
             round2(PI * r * r), 'Area = πr² = 3.14 × ' + r + '² = 3.14 × ' + (r * r) + ' = ' + round2(PI * r * r) + ' cm².', 0.15);
+          qc.visual = V.circleShape(r, { caption: 'Area = the space inside' });
+          return qc;
         }
-        return num('A circle has a radius of ' + r + ' cm. Using π ≈ 3.14, what is its CIRCUMFERENCE in cm? (2 decimal places)',
+        var qcc = num('A circle has a radius of ' + r + ' cm. Using π ≈ 3.14, what is its CIRCUMFERENCE in cm? (2 decimal places)',
           round2(2 * PI * r), 'Circumference = 2πr = 2 × 3.14 × ' + r + ' = ' + round2(2 * PI * r) + ' cm.', 0.15);
+        qcc.visual = V.circleShape(r, { caption: 'Circumference = the distance around the edge' });
+        return qcc;
       }
     },
     {
@@ -735,8 +786,10 @@
         var sorted = nums.slice().sort(function (a, b) { return a - b; });
         var sum = nums.reduce(function (s, v) { return s + v; }, 0);
         if (mode === 'mean') {
-          return num('Find the MEAN of: ' + nums.join(', ') + '   (round to 2 decimals)', round2(sum / n),
+          var qmean = num('Find the MEAN of: ' + nums.join(', ') + '   (round to 2 decimals)', round2(sum / n),
             'Sum = ' + sum + '. Divide by ' + n + ': ' + round2(sum / n) + '.', 0.02);
+          qmean.visual = V.barChart(nums, { caption: 'The mean is the level they would all be if you evened them out' });
+          return qmean;
         }
         if (mode === 'median') {
           return num('Find the MEDIAN of: ' + nums.join(', '), sorted[2],
@@ -789,6 +842,7 @@
         var s = simplifyFrac(red, total);
         var b2 = simplifyFrac(blue, total);
         return Object.assign(makeMC(fracStr(s[0], s[1]), [fracStr(red, blue), fracStr(b2[0], b2[1]), fracStr(total, red)]), {
+          visual: V.marbles({ red: red, blue: blue }, { caption: red + ' red + ' + blue + ' blue = ' + total + ' marbles in total' }),
           prompt: 'A bag has ' + red + ' red and ' + blue + ' blue marbles. What is the probability of picking RED? (simplest form)',
           explanation: red + ' red out of ' + total + ' total = ' + fracStr(red, total) + (fracStr(s[0], s[1]) !== fracStr(red, total) ? ', which simplifies to ' + fracStr(s[0], s[1]) : '') + '.'
         });
@@ -820,6 +874,47 @@
       }
     }
   ];
+
+
+  /* ---- Lesson visuals: every lesson opens with a picture of the idea ---- */
+  var LESSON_VISUALS = {
+    wn_1: V.areaModel(34, 6, { split: [30, 4], leftLabel: '180', rightLabel: '24', caption: '34 x 6 = 180 + 24 = 204' }),
+    wn_2: V.arrayModel(4, 6, { caption: '24 dots in 4 equal rows -> 24 ÷ 4 = 6' }),
+    fd_1: V.fractionBars([{ num: 1, den: 2, label: '1/2' }, { num: 3, den: 6, label: '3/6', color: 'var(--viz-fill-b)' }], 'Different names, exactly the same amount'),
+    fd_2: V.fractionBars([{ num: 1, den: 2, label: '1/2 = 3/6' }, { num: 1, den: 3, label: '1/3 = 2/6', color: 'var(--viz-fill-b)' }], 'Cut both into sixths so the pieces match, then add'),
+    fd_3: V.fractionBar(1, 2, { label: 'Half of the bar...' }),
+    fd_4: V.fractionBars([{ num: 3, den: 4, label: 'we have 3/4' }, { num: 1, den: 2, label: 'in chunks of 1/2', color: 'var(--viz-fill-b)' }], '3/4 ÷ 1/2 asks: how many halves fit into 3/4?'),
+    fd_5: V.percentBar(30, { caption: '0.3 and 30% and 3/10 are all the same amount' }),
+    fd_6: V.numberLine(-2, 2, { points: [{ at: -1, label: '-1/1' }], caption: 'Negative fractions live left of zero' }),
+    in_1: V.numberLine(-8, 8, { points: [{ at: -5, label: '-5' }, { at: 3, label: '3' }], caption: 'Further LEFT means smaller' }),
+    in_2: V.numberLine(-10, 10, { points: [{ at: -8, label: 'start' }], jump: { from: -8, to: -5, label: 'add 3 -> move right' }, caption: '-8 + 3 = -5' }),
+    in_3: V.numberLine(-12, 12, { points: [{ at: -6, label: '-6' }, { at: 6, label: '+6' }], caption: 'Same signs -> positive. Different signs -> negative.' }),
+    rp_1: V.ratioTable([['cups', 'batches'], [2, 3], [4, 6], [6, 9]]),
+    rp_2: V.ratioTable([['notebooks', 'cost'], [5, '$15'], [1, '$3']]),
+    rp_3: V.percentBar(25, { caption: '25% means 25 out of every 100' }),
+    rp_4: V.ratioTable([['x', 'y'], [1, 2.5], [2, 5], [4, 10]]),
+    rp_5: V.percentBar(75, { caption: '25% off means you pay the other 75%' }),
+    rp_6: V.ratioTable([['on the drawing', 'in real life'], ['1 inch', '5 feet'], ['3 inches', '15 feet']]),
+    ee_1: V.balance('3 + 4 x 2', '11', { caption: 'Multiply before you add' }),
+    ee_2: V.balance('3x + 5, x = 4', '17', { caption: 'Swap the letter for the number' }),
+    ee_3: V.fractionBars([{ num: 4, den: 10, label: '4x' }, { num: 2, den: 10, label: '2x', color: 'var(--viz-fill-b)' }], '4x and 2x are the same kind of thing, so they combine into 6x'),
+    ee_4: V.balance('x + 7', '12', { caption: 'Take 7 off BOTH sides to keep it balanced' }),
+    ee_5: V.balance('3x + 5', '20', { caption: 'Undo the +5 first, then undo the x3' }),
+    ee_6: V.numberLine(0, 10, { points: [{ at: 4, label: '4' }], jump: { from: 4, to: 10, label: 'x > 4 is everything over here' }, caption: 'An inequality is a whole range, not one number' }),
+    gm_1: V.rectShape(8, 5, { grid: true, caption: 'Area = squares inside. Perimeter = distance around.' }),
+    gm_2: V.triangleShape(10, 6),
+    gm_3: V.rectShape(4, 3, { grid: true, caption: 'Find the bottom layer, then stack it up' }),
+    gm_4: V.numberLine(0, 180, { points: [{ at: 130, label: '130°' }], caption: 'A straight line is 180° in total' }),
+    gm_5: V.circleShape(5, { caption: 'Circumference = around the edge. Area = space inside.' }),
+    gm_6: V.rectShape(6, 4, { grid: true, caption: 'Break odd shapes into simple ones you know' }),
+    sp_1: V.barChart([4, 8, 6, 2], { caption: 'The mean levels them all out to the same height' }),
+    sp_2: V.barChart([4, 6, 8, 2, 3, 4], { caption: 'Compare two groups by their averages and their spread' }),
+    sp_3: V.marbles({ red: 3, blue: 5 }, { caption: '3 red out of 8 total -> P(red) = 3/8' }),
+    sp_4: V.marbles({ red: 1, blue: 1 }, { caption: 'Two separate events -> multiply the chances' })
+  };
+  LEVELS.forEach(function (lv) {
+    if (LESSON_VISUALS[lv.id]) lv.lesson.visual = LESSON_VISUALS[lv.id];
+  });
 
   root.App = root.App || {};
   root.App.Curriculum = { STRANDS: STRANDS, LEVELS: LEVELS, _helpers: { randInt: randInt, randChoice: randChoice, randNonzero: randNonzero, round2: round2, money: money, fracStr: fracStr, simplifyFrac: simplifyFrac, makeMC: makeMC, num: num, PI: PI, shuffle: shuffle } };

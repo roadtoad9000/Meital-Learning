@@ -137,7 +137,17 @@
 
   // ---------- adaptive placement (binary search down each strand) ----------
   function newDiagnostic() {
-    return { strandIdx: 0, lo: 0, hi: strandLevels(C.STRANDS[0].id).length - 1, highestPassed: -1, asked: 0, results: [], done: false };
+    return {
+      strandIdx: 0, lo: 0, hi: strandLevels(C.STRANDS[0].id).length - 1,
+      highestPassed: -1, asked: 0, results: [], done: false, probingFloor: true
+    };
+  }
+
+  /* The FIRST question in each strand is always its easiest level. Confidence
+     first: a student should get a win before the search starts climbing. */
+  function diagnosticIndex(diag) {
+    if (diag.probingFloor) return diag.lo;
+    return Math.floor((diag.lo + diag.hi) / 2);
   }
 
   function diagnosticCurrentLevel(diag) {
@@ -145,8 +155,7 @@
     if (!strand) return null;
     var levels = strandLevels(strand.id);
     if (diag.lo > diag.hi) return null;
-    var mid = Math.floor((diag.lo + diag.hi) / 2);
-    return levels[mid];
+    return levels[diagnosticIndex(diag)];
   }
 
   /* Record one placement answer and advance the search. Correct → look higher.
@@ -154,11 +163,12 @@
   function diagnosticAnswer(diag, correct) {
     var strand = C.STRANDS[diag.strandIdx];
     var levels = strandLevels(strand.id);
-    var mid = Math.floor((diag.lo + diag.hi) / 2);
+    var mid = diagnosticIndex(diag);
     diag.asked += 1;
     diag.results.push({ levelId: levels[mid].id, correct: correct });
     if (correct) { diag.highestPassed = Math.max(diag.highestPassed, mid); diag.lo = mid + 1; }
     else { diag.hi = mid - 1; }
+    diag.probingFloor = false;
 
     if (diag.lo > diag.hi) {
       diag.strandResults = diag.strandResults || {};
@@ -169,13 +179,15 @@
       diag.lo = 0;
       diag.hi = strandLevels(nextStrand.id).length - 1;
       diag.highestPassed = -1;
+      diag.probingFloor = true;
     }
     return diag;
   }
 
   function diagnosticTotalEstimate() {
+    // +1 per strand for the confidence-building floor question
     return C.STRANDS.reduce(function (sum, s) {
-      return sum + Math.ceil(Math.log2(strandLevels(s.id).length + 1));
+      return sum + 1 + Math.ceil(Math.log2(strandLevels(s.id).length + 1));
     }, 0);
   }
 
@@ -216,19 +228,25 @@
     return q;
   }
 
-  function pointsForAnswer(grade, correct, comboStreak) {
+  function pointsForAnswer(grade, correct, comboStreak, usedHelp) {
     if (!correct) return 0;
     var base = { 4: 10, 5: 15, 6: 20, 7: 25 }[grade] || 15;
+    if (usedHelp) return Math.round(base * 0.4); // still worth something, but not full credit
     var combo = comboStreak > 3 ? (comboStreak - 3) * 5 : 0;
     return base + combo;
   }
 
   /* A level is mastered by demonstrating it: MASTERY_STREAK correct in a row.
      A miss resets the streak — and triggers a teaching moment in the UI. */
-  function recordAnswer(state, levelId, correct) {
+  function recordAnswer(state, levelId, correct, usedHelp) {
     var ls = state.levels[levelId];
     ls.attempts += 1;
-    if (correct) { ls.correct += 1; ls.streak += 1; } else { ls.streak = 0; }
+    if (usedHelp) ls.hintedAnswers = (ls.hintedAnswers || 0) + 1;
+    // Getting it right WITH the answer in front of you doesn't prove mastery,
+    // so a helped question holds the streak rather than advancing it.
+    if (correct && !usedHelp) { ls.correct += 1; ls.streak += 1; }
+    else if (correct) { ls.correct += 1; }
+    else { ls.streak = 0; }
     ls.lastPracticed = root.App.Storage.todayStr();
     var justMastered = false;
     if (ls.streak >= MASTERY_STREAK && !ls.masteredAt) {
@@ -263,7 +281,7 @@
     function give(id) { var b = awardBadge(state, id); if (b) earned.push(b); }
 
     if (ctx.anyCorrect) give('first_steps');
-    if (ctx.lessonCompleted) give('lesson_learner');
+    if (ctx.lessonCompleted && ctx.anyCorrect) give('lesson_learner');
 
     var masteredAny = C.LEVELS.some(function (l) { return isMastered(state, l.id) && !state.levels[l.id].placedByDiagnostic; });
     if (masteredAny) give('first_mastery');
@@ -302,7 +320,22 @@
     state.streak.lastPracticeDate = today;
   }
 
+  var SESSION_COUNTS_MIN_CORRECT = 4;
+
   function completeSession(state, summary) {
+    // A session only counts toward the daily goal (and the streak) if it contained
+    // real, unaided correct work. Otherwise you could farm the bonus by starting
+    // and immediately quitting.
+    var counts = summary.unaidedCorrect >= SESSION_COUNTS_MIN_CORRECT || summary.mastered;
+    if (!counts) {
+      state.history.push({
+        date: root.App.Storage.todayStr(), levelId: summary.levelId,
+        correct: summary.correctCount, total: summary.total,
+        pointsEarned: summary.pointsEarned, mastered: false, counted: false
+      });
+      if (state.history.length > 200) state.history = state.history.slice(-200);
+      return 0;
+    }
     updateStreakOnPractice(state);
     state.dailyGoal.sessionsToday += 1;
     var dailyBonus = 0;
@@ -317,7 +350,8 @@
       correct: summary.correctCount,
       total: summary.total,
       pointsEarned: summary.pointsEarned + dailyBonus,
-      mastered: summary.mastered
+      mastered: summary.mastered,
+      counted: true
     });
     if (state.history.length > 200) state.history = state.history.slice(-200);
     return dailyBonus;
@@ -336,6 +370,7 @@
   root.App = root.App || {};
   root.App.Engine = {
     MASTERY_STREAK: MASTERY_STREAK,
+    SESSION_COUNTS_MIN_CORRECT: SESSION_COUNTS_MIN_CORRECT,
     GUIDED_COUNT: GUIDED_COUNT,
     BADGES: BADGES,
     BADGE_MAP: BADGE_MAP,

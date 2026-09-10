@@ -4,12 +4,13 @@
    Strategy is network-first for the app's own files: if we can reach the network
    we use (and re-cache) the fresh copy, so a plain refresh always picks up a new
    deploy. Cache is the fallback for offline, not the default. */
-var CACHE_NAME = 'math-quest-v4';
+var CACHE_NAME = 'math-quest-v5';
 var APP_SHELL = [
   './',
   './index.html',
   './manifest.json',
   './css/styles.css',
+  './js/visuals.js',
   './js/curriculum.js',
   './js/storage.js',
   './js/engine.js',
