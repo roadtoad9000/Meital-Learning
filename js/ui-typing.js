@@ -151,7 +151,9 @@
       '<div class="next-label">⌨️ NEXT TYPING LESSON</div>' +
       '<h2>' + esc(stage.name) + '</h2>' +
       '<p>' + esc(stage.blurb) + '</p>' +
-      T.renderKeyboard({ nextKey: stage.keys[0] || 'f', learned: stage.learned, newKeys: stage.keys }) +
+      T.renderKeyboard(stage.keys.length
+        ? { nextKey: stage.keys[0], learned: stage.learned, newKeys: stage.keys }
+        : { learned: stage.learned }) +   // review level: nothing new to point at
       '<button class="btn block" id="t-start">' + (stageDone(state, stage.id) ? 'Practise Again →' : 'Teach Me These Keys →') + '</button>' +
       '</div>' +
 
@@ -186,7 +188,7 @@
   function renderLesson(idx) {
     var state = api.getState();
     var stage = T.STAGES[idx];
-    var demoKey = stage.keys[0] || stage.learned[0] || 'f';
+    var demoKey = stage.keys[0] || null;   // review levels teach no new key
     api.hideNav();
     api.setMain(
       '<div class="card lesson">' +
@@ -202,8 +204,10 @@
               '<div class="key-teach-finger">' + esc(f.name) + '</div></div>';
           }).join('') + '</div>'
         : '') +
-      T.renderKeyboard({ nextKey: demoKey, learned: stage.learned, newKeys: stage.keys }) +
-      T.renderHands(T.fingerFor(demoKey)) +
+      T.renderKeyboard(demoKey
+        ? { nextKey: demoKey, learned: stage.learned, newKeys: stage.keys }
+        : { learned: stage.learned }) +
+      (demoKey ? T.renderHands(T.fingerFor(demoKey)) : '') +
       '<div class="callout mt-2"><strong>Golden rule:</strong> don\'t look at your hands. Look at the screen. It feels impossible at first and then suddenly it isn\'t. Being slow is completely fine — being accurate is what counts.</div>' +
       '<button class="btn block mt-2" id="t-go">Start Typing →</button>' +
       '<button class="btn secondary small block mt-1" id="t-back">Back</button>' +
