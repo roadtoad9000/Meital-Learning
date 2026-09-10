@@ -10,7 +10,9 @@
     { id: 'r5', name: 'Stay up 20 min later on a school night', cost: 350 },
     { id: 'r6', name: 'Choose what\'s for dinner one night', cost: 450 },
     { id: 'r7', name: '$5 bonus allowance', cost: 800 },
-    { id: 'r8', name: 'New book of your choice', cost: 1000 }
+    { id: 'r8', name: 'New book of your choice', cost: 1000 },
+    { id: 'r9', name: 'Pick out a new Nee Doh squishy', cost: 700 },
+    { id: 'r10', name: 'Squishy surprise pack (3 mystery squishies)', cost: 1400 }
   ];
 
   function todayStr() {

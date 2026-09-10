@@ -85,6 +85,50 @@
     setTimeout(function () { t.remove(); }, 2400);
   }
 
+  var BLOB_SHAPES = [
+    '42% 58% 63% 37% / 41% 44% 56% 59%',
+    '58% 42% 35% 65% / 55% 40% 60% 45%',
+    '65% 35% 46% 54% / 35% 60% 40% 65%',
+    '40% 60% 55% 45% / 60% 35% 65% 40%',
+    '55% 45% 40% 60% / 45% 60% 35% 65%'
+  ];
+  var BOOP_MESSAGES = ['Squish squish! 🟣', 'Boop!', '*squoosh*', 'Ooh, satisfying.', 'Neeeee-doh!'];
+
+  function squishyCollection() {
+    var unlockedCount = Q.SKILLS.filter(function (s) { return state.skills[s.id].mastery >= Engine.MASTERY_THRESHOLD; }).length;
+    var cells = Q.SKILLS.map(function (s, i) {
+      var d = Q.DOMAIN_MAP[s.domain];
+      var unlocked = state.skills[s.id].mastery >= Engine.MASTERY_THRESHOLD;
+      var shape = BLOB_SHAPES[i % BLOB_SHAPES.length];
+      var style = 'border-radius:' + shape + (unlocked ? ';background:' + d.color : '');
+      var titleText = unlocked ? (s.name + ' squishy — collected!') : ('Master ' + s.name + ' to unlock this squishy');
+      return '<div class="squishy-cell">' +
+        '<div class="squishy ' + (unlocked ? 'unlocked' : 'locked') + '" data-squishy="' + s.id + '" style="' + style + '" title="' + esc(titleText) + '">' +
+        (unlocked ? '' : '<span class="squishy-lock">🔒</span>') +
+        '</div>' +
+        '<div class="squishy-name">' + esc(d.short) + '</div>' +
+        '</div>';
+    }).join('');
+    return '<div class="card">' +
+      '<div class="section-title"><h2>🧸 Squish Collection</h2><span class="text-soft">' + unlockedCount + ' / ' + Q.SKILLS.length + ' collected</span></div>' +
+      '<p>Every skill you master unlocks a new squishy for your collection.</p>' +
+      '<div class="squishy-grid">' + cells + '</div>' +
+      '</div>';
+  }
+
+  function wireSquishies(container) {
+    $all('.squishy.unlocked', container).forEach(function (el) {
+      el.addEventListener('click', function () {
+        el.classList.remove('squish-pop');
+        void el.offsetWidth;
+        el.classList.add('squish-pop');
+      });
+    });
+    $all('.squishy.locked', container).forEach(function (el) {
+      el.addEventListener('click', function () { toast('Master that skill to unlock its squishy! 🔒'); });
+    });
+  }
+
   function statusForMastery(m) {
     if (m >= Engine.MASTERY_THRESHOLD) return { label: 'Mastered', cls: 'status-mastered' };
     if (m >= 60) return { label: 'Proficient', cls: 'status-proficient' };
@@ -262,12 +306,14 @@
       '</div>' +
       '<div class="card"><h2>Your Mastery Map</h2>' + domainRingGrid(true) + '</div>' +
       '<div class="card"><h2>Badges</h2>' + badgeShelf() + '</div>' +
+      squishyCollection() +
       '</div>';
 
     $('#start-recommended-btn').addEventListener('click', function () { startSprint(weakest.id); });
     $all('.ring-card', mainEl).forEach(function (card) {
       card.addEventListener('click', function () { startSprint(card.getAttribute('data-domain')); });
     });
+    wireSquishies(mainEl);
   }
 
   // ---------- sprint ----------
@@ -316,7 +362,8 @@
       '<p>' + summary.correctCount + ' / ' + summary.total + ' correct (' + acc + '%)</p>' +
       '<p style="font-size:1.3rem;font-weight:800;color:var(--accent);">+' + (summary.pointsEarned + summary.dailyBonus) + ' points earned 💎</p>' +
       (summary.dailyBonus ? '<p>🎯 Daily goal bonus included!</p>' : '') +
-      (masteredNames.length ? ('<p>🔓 Skill' + (masteredNames.length > 1 ? 's' : '') + ' mastered: <strong>' + masteredNames.map(esc).join(', ') + '</strong></p>') : '') +
+      (masteredNames.length ? ('<p>🔓 Skill' + (masteredNames.length > 1 ? 's' : '') + ' mastered: <strong>' + masteredNames.map(esc).join(', ') + '</strong> — new squishy' + (masteredNames.length > 1 ? 'ies' : '') + ' unlocked! 🧸</p>') : '') +
+      (summary.sprintPerfect ? '<p class="text-soft">Squishy-smooth — not one mistake! 🟣</p>' : '') +
       '<div class="grid grid-2 mt-2">' +
       '<button class="btn" id="another-sprint-btn">Do Another Sprint →</button>' +
       '<button class="btn secondary" id="back-dashboard-btn">Back to Dashboard</button>' +
@@ -467,6 +514,15 @@
     headerStatsEl = $('#header-stats');
     state = Storage.load();
     updateHeaderStats();
+    var mascot = $('#squish-mascot');
+    if (mascot) {
+      mascot.addEventListener('click', function () {
+        mascot.classList.remove('squish-pop');
+        void mascot.offsetWidth;
+        mascot.classList.add('squish-pop');
+        toast(BOOP_MESSAGES[Math.floor(Math.random() * BOOP_MESSAGES.length)]);
+      });
+    }
     if (!state.diagnosticDone) renderWelcome();
     else renderDashboard();
   }

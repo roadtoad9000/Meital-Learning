@@ -220,3 +220,47 @@ input[type="text"], input[type="number"] { font-family: inherit; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 .parent-gate { text-align: center; padding: 40px 20px; }
+
+/* ---------- squish mascot & collectibles ---------- */
+@keyframes squish-breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.06, 0.94); }
+}
+@keyframes squish-pop {
+  0% { transform: scale(1, 1); }
+  30% { transform: scale(1.32, 0.68); }
+  55% { transform: scale(0.82, 1.18); }
+  75% { transform: scale(1.08, 0.94); }
+  100% { transform: scale(1, 1); }
+}
+
+.squish-mascot {
+  width: 34px; height: 34px; margin-left: 6px; position: relative; cursor: pointer;
+  border-radius: 58% 42% 63% 37% / 41% 44% 56% 59%;
+  background: linear-gradient(160deg, #c9b6ff, var(--accent-2));
+  box-shadow: inset -3px -4px 8px rgba(0,0,0,0.15), inset 3px 4px 8px rgba(255,255,255,0.35);
+  animation: squish-breathe 2.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.squish-mascot::before {
+  content: ''; position: absolute; width: 4px; height: 4px; border-radius: 50%;
+  background: #241f3d; top: 38%; left: 30%; box-shadow: 10px 0 0 #241f3d;
+}
+.squish-mascot.squish-pop { animation: squish-pop 0.45s ease; }
+
+.squishy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 16px 10px; }
+.squishy-cell { text-align: center; }
+.squishy {
+  width: 52px; height: 52px; margin: 0 auto; position: relative;
+  box-shadow: inset -4px -6px 10px rgba(0,0,0,0.15), inset 4px 6px 10px rgba(255,255,255,0.3);
+  transition: transform .15s ease;
+  cursor: pointer;
+}
+.squishy.unlocked:hover { transform: scale(1.08); }
+.squishy.locked {
+  background: var(--border) !important; filter: grayscale(1); opacity: 0.55;
+  box-shadow: none; cursor: default;
+}
+.squishy.squish-pop { animation: squish-pop 0.45s ease; }
+.squishy-lock { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+.squishy-name { font-size: 0.66rem; margin-top: 5px; color: var(--text-soft); line-height: 1.15; }
