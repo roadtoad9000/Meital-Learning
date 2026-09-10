@@ -246,7 +246,11 @@
       '<button class="btn secondary small" id="t-restart">↻ Restart line</button>' +
       '<button class="btn secondary small" id="t-quit">Finish</button>' +
       '</div>' +
-      '<div class="text-soft mt-1" style="font-size:.8rem">Tip: if you hit the wrong key nothing moves — just try again. Wrong letters never get typed here, so you can\'t practise a mistake.</div>' +
+      '<div class="text-soft mt-1" style="font-size:.8rem">' +
+      (drill.placement
+        ? 'Type it however you normally would — hunt and peck is completely fine. We are just watching which keys you already know.'
+        : 'Tip: if you hit the wrong key nothing moves — just try again. Wrong letters never get typed here, so you can\'t practise a mistake.') +
+      '</div>' +
       '</div>'
     );
     paintDrill();
@@ -268,11 +272,16 @@
 
     var next = t[drill.pos] || '';
     var kb = $('#t-kb');
-    if (kb) kb.innerHTML = T.renderKeyboard({
-      nextKey: next, learned: drill.stage.learned, newKeys: drill.stage.keys
-    });
+    if (kb) {
+      kb.innerHTML = drill.placement
+        // Placement measures what they can ALREADY do, so the keyboard is a plain
+        // reference: nothing dimmed (they're using every letter) and no next-key
+        // highlight, which would otherwise hand them the answer and inflate the score.
+        ? T.renderKeyboard({ learned: T.ALL_KEYS })
+        : T.renderKeyboard({ nextKey: next, learned: drill.stage.learned, newKeys: drill.stage.keys });
+    }
     var hands = $('#t-hands');
-    if (hands) hands.innerHTML = T.renderHands(T.fingerFor(next));
+    if (hands) hands.innerHTML = drill.placement ? '' : T.renderHands(T.fingerFor(next));
 
     var live = $('#t-live');
     if (live) {

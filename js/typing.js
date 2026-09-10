@@ -43,6 +43,7 @@
     ['z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/']
   ];
   var HOME_KEYS = ['a', 's', 'd', 'f', 'j', 'k', 'l', ';'];
+  var ALL_KEYS = ROWS[0].concat(ROWS[1], ROWS[2], [' ']);
 
   /* ---------- word banks, filtered by which keys are known ---------- */
   var WORD_BANK = [
@@ -270,6 +271,7 @@
     KEY_FINGER: KEY_FINGER,
     ROWS: ROWS,
     HOME_KEYS: HOME_KEYS,
+    ALL_KEYS: ALL_KEYS,
     STAGES: STAGES,
     BRANCHES: BRANCHES,
     PLACEMENT_TEXTS: PLACEMENT_TEXTS,
