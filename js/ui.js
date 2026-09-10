@@ -316,7 +316,7 @@
       '</div>' +
       '<div class="card"><h2>Your Skill Strands</h2><div class="strand-grid">' + strandCards + '</div></div>' +
       '<div class="card"><h2>Badges</h2>' + badgeShelf() + '</div>' +
-      squishyCollection() +
+      squishyCollection('math') +
       '</div>';
 
     if (state.placementSkipped) {
@@ -630,31 +630,61 @@
   }
 
   // ---------- squishies ----------
-  var BLOBS = ['42% 58% 63% 37% / 41% 44% 56% 59%', '58% 42% 35% 65% / 55% 40% 60% 45%', '65% 35% 46% 54% / 35% 60% 40% 65%', '40% 60% 55% 45% / 60% 35% 65% 40%', '55% 45% 40% 60% / 45% 60% 35% 65%'];
   var BOOPS = ['Squish squish! 🟣', 'Boop!', '*squoosh*', 'Ooh, satisfying.', 'Neeeee-doh!'];
 
-  function squishyCollection() {
-    var earned = C.LEVELS.filter(function (l) { return state.levels[l.id].masteredAt; }).length;
-    var cells = C.LEVELS.map(function (lv, i) {
-      var s = Engine.STRAND_MAP[lv.strand];
-      var got = !!state.levels[lv.id].masteredAt;
-      var style = 'border-radius:' + BLOBS[i % BLOBS.length] + (got ? ';background:' + s.color : '');
-      return '<div class="squishy-cell">' +
-        '<div class="squishy ' + (got ? 'unlocked' : 'locked') + '" data-squishy="' + lv.id + '" style="' + style + '" title="' + esc(got ? lv.name + ' — collected!' : 'Master ' + lv.name + ' to unlock') + '">' +
-        (got ? '' : '<span class="squishy-lock">🔒</span>') + '</div></div>';
+  /* Math and typing each keep their OWN collection of the same 36 squishies,
+     so progress in one never quietly fills in the other. */
+  function unlocksFor(app) {
+    var SQ = root.App.Squishies;
+    var n;
+    if (app === 'typing') {
+      n = (root.App.UITyping && root.App.Typing)
+        ? root.App.Typing.STAGES.filter(function (st) { return root.App.UITyping.stageDone(state, st.id); }).length
+        : 0;
+    } else {
+      n = C.LEVELS.filter(function (l) { return state.levels[l.id].masteredAt; }).length;
+    }
+    return Math.min(n, SQ.total);
+  }
+
+  function squishyCollection(app) {
+    app = app || 'math';
+    var SQ = root.App.Squishies;
+    var earned = unlocksFor(app);
+    var next = SQ.CATALOG[earned] || null;
+    var label = app === 'typing' ? '⌨️ Typing Squishies' : '🧮 Math Squishies';
+    var how = app === 'typing' ? 'typing level you finish' : 'math level you master';
+    var other = app === 'typing' ? 'math' : 'typing';
+    var otherCount = unlocksFor(other);
+
+    var cells = SQ.CATALOG.map(function (sq, i) {
+      return SQ.render(sq.id, { locked: i >= earned, showName: true, showTier: true });
     }).join('');
-    return '<div class="card"><div class="section-title"><h2>🧸 Squish Collection</h2><span class="text-soft">' + earned + ' / ' + C.LEVELS.length + '</span></div>' +
-      '<p>Master a level, earn a squishy.</p><div class="squishy-grid">' + cells + '</div></div>';
+
+    return '<div class="card">' +
+      '<div class="section-title"><h2>🧸 ' + label + '</h2><span class="text-soft">' + earned + ' / ' + SQ.total + '</span></div>' +
+      '<p>Every ' + how + ' unlocks the next one, and they get rarer as you go. ' +
+      'Your ' + other + ' squishies are a separate set (' + otherCount + ' / ' + SQ.total + ' there).</p>' +
+      (next
+        ? '<div class="sq-next">' +
+            '<div class="sq-next-art">' + SQ.render(next.id, { locked: true }) + '</div>' +
+            '<div><div class="sq-next-label">NEXT UP</div>' +
+            '<div class="sq-next-name">' + esc(next.name) + '</div>' +
+            '<div class="sq-next-tier" style="color:' + SQ.TIERS[next.tier].color + '">' + SQ.TIERS[next.tier].name + '</div>' +
+            '<div class="text-soft" style="font-size:.8rem">Finish one more ' + (app === 'typing' ? 'typing' : 'math') + ' level to unlock it.</div></div>' +
+          '</div>'
+        : '<div class="sq-next"><div><div class="sq-next-label">🏆 COMPLETE</div><div class="sq-next-name">You collected every single one.</div></div></div>') +
+      '<div class="squishy-grid mt-2">' + cells + '</div></div>';
   }
 
   function wireSquishies(ctx) {
-    $all('.squishy.unlocked', ctx).forEach(function (el) {
+    $all('.sq:not(.locked)', ctx).forEach(function (el) {
       el.addEventListener('click', function () {
         el.classList.remove('squish-pop'); void el.offsetWidth; el.classList.add('squish-pop');
       });
     });
-    $all('.squishy.locked', ctx).forEach(function (el) {
-      el.addEventListener('click', function () { toast('Master that level to unlock its squishy! 🔒'); });
+    $all('.sq.locked', ctx).forEach(function (el) {
+      el.addEventListener('click', function () { toast('Finish another level to unlock this one! 🔒'); });
     });
   }
 
@@ -909,7 +939,15 @@
         save: save,
         toast: toast,
         confetti: confetti,
-        addPoints: function (n) { Engine.addPoints(state, n); }
+        addPoints: function (n) { Engine.addPoints(state, n); },
+        squishyCollection: function () { return squishyCollection('typing'); },
+        wireSquishies: wireSquishies,
+        newSquishy: function () {
+          var SQ = root.App.Squishies;
+          var sq = SQ.CATALOG[unlocksFor('typing') - 1];
+          if (!sq) return null;
+          return { art: SQ.render(sq.id, {}), name: sq.name, tier: SQ.TIERS[sq.tier].name, color: SQ.TIERS[sq.tier].color };
+        }
       });
     }
 

@@ -83,6 +83,44 @@
     'my brother is part gremlin'
   ];
 
+  /* Placement texts. Each is a pangram, so one pass exercises every letter and
+     we get a real per-key accuracy read in about a minute. */
+  var PLACEMENT_TEXTS = [
+    'the quick brown fox jumps over the lazy dog.',
+    'sphinx of black quartz, judge my vow.',
+    'jinxed wizards pluck ivy from the big quilt.',
+    'waltz, bad nymph, for quick jigs vex.'
+  ];
+
+  function placementText() {
+    return PLACEMENT_TEXTS[Math.floor(Math.random() * PLACEMENT_TEXTS.length)];
+  }
+
+  /* Given per-key accuracy from a placement run, decide which stages the learner
+     has already demonstrated. A stage counts as known when every key it teaches
+     was typed accurately enough. Mirrors the math placement: skip what they can
+     already do, teach what they can't. */
+  function stagesPassedFrom(keyStats, minAccuracy) {
+    minAccuracy = minAccuracy === undefined ? 0.9 : minAccuracy;
+    var passed = {};
+    for (var i = 0; i < STAGES.length; i++) {
+      var st = STAGES[i];
+      if (st.speed) break;                      // never auto-pass the speed level
+      var keys = st.keys.length ? st.keys : st.learned;
+      // Only judge keys the placement text actually exercised. Rare keys like ; and /
+      // never show up in a sentence, so treating them as failures would stall the
+      // whole ladder for a learner who types fluently.
+      var judged = keys.filter(function (k) { return keyStats[k] && keyStats[k].total > 0; });
+      if (!judged.length) break;                 // nothing to go on — stop here
+      var ok = judged.every(function (k) {
+        return (keyStats[k].correct / keyStats[k].total) >= minAccuracy;
+      });
+      if (!ok) break;                            // stop at the first gap: it's a ladder
+      passed[st.id] = true;
+    }
+    return passed;
+  }
+
   function keysKnown(learned, word) {
     for (var i = 0; i < word.length; i++) {
       if (word[i] === ' ') continue;
@@ -106,26 +144,33 @@
   /* ---------- the lesson ladder ----------
      Each stage adds only a couple of keys. `drill` builds the target text from
      whatever the learner knows so far. */
+  var BRANCHES = [
+    { id: 'home', name: 'Home Row', emoji: '🏠', blurb: 'Where your fingers live. Everything else is measured from here.' },
+    { id: 'top', name: 'Top Row', emoji: '⬆️', blurb: 'Reaching up — and snapping back to home.' },
+    { id: 'bottom', name: 'Bottom Row', emoji: '⬇️', blurb: 'Reaching down. The last stretch.' },
+    { id: 'mastery', name: 'Whole Keyboard', emoji: '🏆', blurb: 'Everything together, then speed.' }
+  ];
+
   var STAGES = [
-    { id: 't1', name: 'Home Base: F and J', keys: ['f', 'j'], blurb: 'Feel the little bumps on F and J — those are your anchors. Your index fingers live there.' },
-    { id: 't2', name: 'D and K', keys: ['d', 'k'], blurb: 'Middle fingers, right next door to F and J.' },
-    { id: 't3', name: 'S and L', keys: ['s', 'l'], blurb: 'Ring fingers. Keep those index fingers on the bumps!' },
-    { id: 't4', name: 'A and Semicolon', keys: ['a', ';'], blurb: 'Pinkies! The whole home row is yours now.' },
-    { id: 't5', name: 'The Whole Home Row', keys: [], review: true, blurb: 'All eight home keys together. This is the position your hands always come back to.' },
-    { id: 't6', name: 'G and H', keys: ['g', 'h'], blurb: 'Index fingers stretch inward — then snap straight back to F and J.' },
-    { id: 't7', name: 'E and I', keys: ['e', 'i'], blurb: 'Reaching UP with your middle fingers. Two of the most common letters in English.' },
-    { id: 't8', name: 'R and U', keys: ['r', 'u'], blurb: 'Index fingers reach up. Now real words start appearing.' },
-    { id: 't9', name: 'T and Y', keys: ['t', 'y'], blurb: 'The big index-finger stretch across the middle.' },
-    { id: 't10', name: 'W and O', keys: ['w', 'o'], blurb: 'Ring fingers reach up.' },
-    { id: 't11', name: 'Q and P', keys: ['q', 'p'], blurb: 'Pinkies up top. The trickiest reach — take it slow.' },
-    { id: 't12', name: 'Top Row Complete', keys: [], review: true, blurb: 'Everything from Q to P, plus the home row.' },
-    { id: 't13', name: 'C and Comma', keys: ['c', ','], blurb: 'Now we go DOWN. Middle fingers dip below home.' },
-    { id: 't14', name: 'V and M', keys: ['v', 'm'], blurb: 'Index fingers down.' },
-    { id: 't15', name: 'X and Period', keys: ['x', '.'], blurb: 'Ring fingers down.' },
-    { id: 't16', name: 'Z and Slash', keys: ['z', '/'], blurb: 'Pinkies down. Z is rare — but you need it for pizza and puzzles.' },
-    { id: 't17', name: 'B and N', keys: ['b', 'n'], blurb: 'The last two! Big index stretches.' },
-    { id: 't18', name: 'The Whole Keyboard', keys: [], review: true, phrases: true, blurb: 'Every letter. Real sentences now — and they get silly.' },
-    { id: 't19', name: 'Speed Run', keys: [], review: true, phrases: true, speed: true, blurb: 'You know every key. NOW we care about speed — accuracy first, always.' }
+    { id: 't1', branch: 'home', name: 'Home Base: F and J', keys: ['f', 'j'], blurb: 'Feel the little bumps on F and J — those are your anchors. Your index fingers live there.' },
+    { id: 't2', branch: 'home', name: 'D and K', keys: ['d', 'k'], blurb: 'Middle fingers, right next door to F and J.' },
+    { id: 't3', branch: 'home', name: 'S and L', keys: ['s', 'l'], blurb: 'Ring fingers. Keep those index fingers on the bumps!' },
+    { id: 't4', branch: 'home', name: 'A and Semicolon', keys: ['a', ';'], blurb: 'Pinkies! The whole home row is yours now.' },
+    { id: 't5', branch: 'home', name: 'The Whole Home Row', keys: [], review: true, blurb: 'All eight home keys together. This is the position your hands always come back to.' },
+    { id: 't6', branch: 'top', name: 'G and H', keys: ['g', 'h'], blurb: 'Index fingers stretch inward — then snap straight back to F and J.' },
+    { id: 't7', branch: 'top', name: 'E and I', keys: ['e', 'i'], blurb: 'Reaching UP with your middle fingers. Two of the most common letters in English.' },
+    { id: 't8', branch: 'top', name: 'R and U', keys: ['r', 'u'], blurb: 'Index fingers reach up. Now real words start appearing.' },
+    { id: 't9', branch: 'top', name: 'T and Y', keys: ['t', 'y'], blurb: 'The big index-finger stretch across the middle.' },
+    { id: 't10', branch: 'top', name: 'W and O', keys: ['w', 'o'], blurb: 'Ring fingers reach up.' },
+    { id: 't11', branch: 'top', name: 'Q and P', keys: ['q', 'p'], blurb: 'Pinkies up top. The trickiest reach — take it slow.' },
+    { id: 't12', branch: 'top', name: 'Top Row Complete', keys: [], review: true, blurb: 'Everything from Q to P, plus the home row.' },
+    { id: 't13', branch: 'bottom', name: 'C and Comma', keys: ['c', ','], blurb: 'Now we go DOWN. Middle fingers dip below home.' },
+    { id: 't14', branch: 'bottom', name: 'V and M', keys: ['v', 'm'], blurb: 'Index fingers down.' },
+    { id: 't15', branch: 'bottom', name: 'X and Period', keys: ['x', '.'], blurb: 'Ring fingers down.' },
+    { id: 't16', branch: 'bottom', name: 'Z and Slash', keys: ['z', '/'], blurb: 'Pinkies down. Z is rare — but you need it for pizza and puzzles.' },
+    { id: 't17', branch: 'bottom', name: 'B and N', keys: ['b', 'n'], blurb: 'The last two! Big index stretches.' },
+    { id: 't18', branch: 'mastery', name: 'The Whole Keyboard', keys: [], review: true, phrases: true, blurb: 'Every letter. Real sentences now — and they get silly.' },
+    { id: 't19', branch: 'mastery', name: 'Speed Run', keys: [], review: true, phrases: true, speed: true, blurb: 'You know every key. NOW we care about speed — accuracy first, always.' }
   ];
 
   // cumulative key knowledge at each stage
@@ -226,6 +271,10 @@
     ROWS: ROWS,
     HOME_KEYS: HOME_KEYS,
     STAGES: STAGES,
+    BRANCHES: BRANCHES,
+    PLACEMENT_TEXTS: PLACEMENT_TEXTS,
+    placementText: placementText,
+    stagesPassedFrom: stagesPassedFrom,
     drillText: drillText,
     renderKeyboard: renderKeyboard,
     renderHands: renderHands,

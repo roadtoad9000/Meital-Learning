@@ -47,26 +47,102 @@
       .slice(0, limit || 5);
   }
 
+  // ---------------- placement ----------------
+  function renderPlacementIntro() {
+    var state = api.getState();
+    api.hideNav();
+    api.setMain(
+      '<div class="card center">' +
+      '<div class="big-emoji">⌨️</div>' +
+      '<h1>Show us what you\'ve got</h1>' +
+      '<p>Type one silly sentence, however you normally type. Two fingers, looking at the keys — whatever. There is no wrong way to do this one.</p>' +
+      '<div class="callout">We are not grading you. We just want to see <strong>which keys your fingers already know</strong>, so we can skip all of those and only teach the ones that trip you up.</div>' +
+      '<button class="btn" id="tp-go">Let\'s Do It →</button>' +
+      '<button class="btn secondary small block mt-2" id="tp-skip">Skip — just start at the beginning</button>' +
+      '</div>');
+    $('#tp-go').addEventListener('click', function () { startDrill(0, true); });
+    $('#tp-skip').addEventListener('click', function () {
+      tstate(state).placed = true;
+      api.save();
+      renderHome();
+    });
+  }
+
+  function finishPlacement(accuracy, wpm) {
+    var state = api.getState();
+    var ts = tstate(state);
+    var passed = T.stagesPassedFrom(ts.keyStats, 0.9);
+    var count = 0;
+    Object.keys(passed).forEach(function (id) {
+      var rec = ts.stages[id] || { attempts: 0, bestAccuracy: 0, completed: false };
+      if (!rec.completed) { rec.completed = true; rec.placed = true; count++; }
+      rec.bestAccuracy = Math.max(rec.bestAccuracy, accuracy);
+      ts.stages[id] = rec;
+    });
+    ts.placed = true;
+    ts.placementResult = { accuracy: accuracy, wpm: wpm, date: Storage.todayStr() };
+    api.save();
+
+    var idx = currentStageIdx(state);
+    var stage = T.STAGES[idx];
+    var weak = weakKeys(state, 6);
+
+    api.setMain(
+      '<div class="card">' +
+      '<div class="center"><div class="big-emoji">🔎</div><h1>Here\'s What We Found</h1></div>' +
+      '<div class="type-scores">' +
+      '<div><span class="ts-num">' + accuracy + '%</span><span class="ts-lab">accuracy</span></div>' +
+      '<div><span class="ts-num">' + wpm + '</span><span class="ts-lab">words/min</span></div>' +
+      '</div>' +
+      (count
+        ? '<p class="center">Your fingers already know <strong>' + count + ' level' + (count === 1 ? '' : 's') + '</strong> worth of keys — we\'ll skip straight past those.</p>'
+        : '<p class="center">We\'ll start you right at the beginning, which is exactly where most people start. No shame in it at all.</p>') +
+      (weak.length
+        ? '<div class="callout"><strong>The keys tripping you up:</strong> ' +
+          weak.map(function (k) { return '<kbd>' + esc(k) + '</kbd>'; }).join(' ') +
+          '<br>These are what we\'ll drill — not the ones you already have.</div>'
+        : '') +
+      '<div class="lesson-h mt-2">🎯 Starting you here</div>' +
+      '<div class="tstage current"><span class="tstage-icon">⌨️</span><span class="tstage-name">' + esc(stage.name) + '</span></div>' +
+      T.renderKeyboard({ learned: stage.learned, heat: true, accuracy: ts.keyStats }) +
+      '<p class="text-soft center" style="font-size:.82rem">Green keys are solid. Red keys need work. This map updates every time you practise.</p>' +
+      '<div class="center mt-2"><button class="btn" id="tp-start">Start Learning →</button></div>' +
+      '</div>');
+    api.confetti();
+    $('#tp-start').addEventListener('click', renderHome);
+  }
+
   // ---------------- home ----------------
   function renderHome() {
     var state = api.getState();
     var ts = tstate(state);
+    if (!ts.placed) return renderPlacementIntro();
+    if (api.renderNav) api.renderNav('typing');   // drills hide the nav; restore it here
     var idx = currentStageIdx(state);
     var stage = T.STAGES[idx];
     var doneCount = T.STAGES.filter(function (s) { return stageDone(state, s.id); }).length;
     var weak = weakKeys(state, 5);
 
-    var ladder = T.STAGES.map(function (s, i) {
-      var done = stageDone(state, s.id);
-      var cur = i === idx;
-      var st = ts.stages[s.id];
-      return '<div class="tstage ' + (done ? 'done' : cur ? 'current' : 'locked') + '"' +
-        (done || cur ? ' data-stage="' + i + '"' : '') + '>' +
-        '<span class="tstage-icon">' + (done ? '✅' : cur ? '⌨️' : '🔒') + '</span>' +
-        '<span class="tstage-name">' + esc(s.name) + '</span>' +
-        '<span class="tstage-keys">' + (s.keys.length ? s.keys.map(function (k) { return '<kbd>' + esc(k) + '</kbd>'; }).join('') : '<em>review</em>') + '</span>' +
-        '<span class="tstage-note">' + (st && st.bestAccuracy ? st.bestAccuracy + '% best' : '') + '</span>' +
-        '</div>';
+    var ladder = T.BRANCHES.map(function (br) {
+      var inBranch = T.STAGES.filter(function (s) { return s.branch === br.id; });
+      var doneIn = inBranch.filter(function (s) { return stageDone(state, s.id); }).length;
+      var rows = inBranch.map(function (s) {
+        var i = s.index;
+        var done = stageDone(state, s.id);
+        var cur = i === idx;
+        var st = ts.stages[s.id];
+        var note = st && st.placed ? 'already knew it' : (st && st.bestAccuracy ? st.bestAccuracy + '% best' : '');
+        return '<div class="tstage ' + (done ? 'done' : cur ? 'current' : 'locked') + '"' +
+          (done || cur ? ' data-stage="' + i + '"' : '') + '>' +
+          '<span class="tstage-icon">' + (done ? '✅' : cur ? '⌨️' : '🔒') + '</span>' +
+          '<span class="tstage-name">' + esc(s.name) + '</span>' +
+          '<span class="tstage-keys">' + (s.keys.length ? s.keys.map(function (k) { return '<kbd>' + esc(k) + '</kbd>'; }).join('') : '<em>review</em>') + '</span>' +
+          '<span class="tstage-note">' + note + '</span></div>';
+      }).join('');
+      return '<div class="tbranch">' +
+        '<div class="tbranch-head"><span>' + br.emoji + ' <strong>' + esc(br.name) + '</strong></span>' +
+        '<span class="text-soft">' + doneIn + ' / ' + inBranch.length + '</span></div>' +
+        '<div class="tbranch-blurb">' + esc(br.blurb) + '</div>' + rows + '</div>';
     }).join('');
 
     api.setMain(
@@ -94,9 +170,11 @@
         : '<p class="mt-1 text-soft">Not enough data yet — do a few drills and this will fill in.</p>') +
       '</div>' +
 
-      '<div class="card"><h2>Levels</h2><div class="tstage-list">' + ladder + '</div></div>' +
+      '<div class="card"><h2>🌳 Your Typing Tree</h2><p>Each branch unlocks the next. You can only move up once the row below is solid.</p><div class="tstage-list">' + ladder + '</div></div>' +
+      (api.squishyCollection ? api.squishyCollection() : '') +
       '</div>'
     );
+    if (api.wireSquishies) api.wireSquishies(document);
 
     $('#t-start').addEventListener('click', function () { renderLesson(idx); });
     $all('.tstage[data-stage]').forEach(function (el) {
@@ -136,13 +214,14 @@
   }
 
   // ---------------- the drill ----------------
-  function startDrill(idx) {
+  function startDrill(idx, isPlacement) {
     var state = api.getState();
     var stage = T.STAGES[idx];
     drill = {
       idx: idx,
       stage: stage,
-      text: T.drillText(stage, weakKeys(state, 4)),
+      placement: !!isPlacement,
+      text: isPlacement ? T.placementText() : T.drillText(stage, weakKeys(state, 4)),
       pos: 0,
       typed: 0,
       errors: 0,
@@ -158,7 +237,7 @@
     api.hideNav();
     api.setMain(
       '<div class="card typing-card">' +
-      '<div class="quiz-meta"><span>⌨️ ' + esc(stage.name) + '</span>' +
+      '<div class="quiz-meta"><span>⌨️ ' + (drill.placement ? 'Placement — type it however you like' : esc(stage.name)) + '</span>' +
       '<span class="text-soft" id="t-live"></span></div>' +
       '<div class="type-target" id="t-target"></div>' +
       '<div id="t-kb"></div>' +
@@ -272,6 +351,11 @@
     });
     ts.totalChars += drill.pos;
 
+    if (drill.placement) {
+      api.save();
+      return finishPlacement(accuracy, wpm);
+    }
+
     var rec = ts.stages[stage.id] || { attempts: 0, bestAccuracy: 0, completed: false, bestWpm: 0 };
     rec.attempts += 1;
     rec.bestAccuracy = Math.max(rec.bestAccuracy, accuracy);
@@ -307,6 +391,12 @@
       (stage.speed || wpm ? '<div><span class="ts-num">' + wpm + '</span><span class="ts-lab">words/min</span></div>' : '') +
       '<div><span class="ts-num">+' + pts + '</span><span class="ts-lab">points 💎</span></div>' +
       '</div>' +
+      (newlyCompleted && api.newSquishy ? (function () {
+        var sq = api.newSquishy();
+        return sq ? '<div class="sq-won">' + sq.art + '<div><div class="sq-next-label">NEW SQUISHY!</div>' +
+          '<div class="sq-next-name">' + sq.name + '</div>' +
+          '<div class="sq-next-tier" style="color:' + sq.color + '">' + sq.tier + '</div></div></div>' : '';
+      })() : '') +
       (passed ? '' : '<p class="text-soft">You need ' + PASS_ACCURACY + '% accuracy to unlock the next level. No rush — go as slow as you like.</p>') +
       '<div class="grid grid-2 mt-2">' +
       '<button class="btn" id="t-again">' + (passed ? 'Next Level →' : 'Try Again →') + '</button>' +
@@ -326,6 +416,7 @@
   root.App.UITyping = {
     init: function (sharedApi) { api = sharedApi; },
     renderHome: renderHome,
+    renderPlacementIntro: renderPlacementIntro,
     tstate: tstate,
     weakKeys: weakKeys,
     currentStageIdx: currentStageIdx,
