@@ -68,18 +68,52 @@
     { id: 'rewards', label: '🎁 Rewards' },
     { id: 'parent', label: '👪 Parent Zone' }
   ];
+  var NAV_TYPING = [
+    { id: 'typing', label: '⌨️ Typing Home' },
+    { id: 'rewards', label: '🎁 Rewards' },
+    { id: 'parent', label: '👪 Parent Zone' }
+  ];
+  var currentApp = 'math';
+
   function renderNav(active) {
     navEl.classList.remove('hidden');
-    navEl.innerHTML = NAV.map(function (n) {
-      return '<button class="nav-btn' + (n.id === active ? ' active' : '') + '" data-view="' + n.id + '">' + n.label + '</button>';
-    }).join('');
+    var items = currentApp === 'typing' ? NAV_TYPING : NAV;
+    navEl.innerHTML =
+      '<div class="app-switch">' +
+      '<button class="app-tab' + (currentApp === 'math' ? ' on' : '') + '" data-app="math">🧮 Math</button>' +
+      '<button class="app-tab' + (currentApp === 'typing' ? ' on' : '') + '" data-app="typing">⌨️ Typing</button>' +
+      '</div>' +
+      items.map(function (n) {
+        return '<button class="nav-btn' + (n.id === active ? ' active' : '') + '" data-view="' + n.id + '">' + n.label + '</button>';
+      }).join('');
     $all('.nav-btn', navEl).forEach(function (b) {
       b.addEventListener('click', function () { go(b.getAttribute('data-view')); });
     });
+    $all('.app-tab', navEl).forEach(function (b) {
+      b.addEventListener('click', function () { switchApp(b.getAttribute('data-app')); });
+    });
+  }
+
+  function setBrand(app) {
+    var t = $('.brand-title'), sub = $('.brand-sub');
+    if (!t || !sub) return;
+    if (app === 'typing') { t.textContent = 'Typing Quest'; sub.textContent = 'Learn to type without looking'; }
+    else { t.textContent = 'Math Quest'; sub.textContent = 'Grades 4–7 · Learn it, then master it'; }
+  }
+
+  function switchApp(app) {
+    if (root.App.UITyping) root.App.UITyping.cleanup();
+    currentApp = app;
+    setBrand(app);
+    if (app === 'typing') { renderNav('typing'); root.App.UITyping.renderHome(); }
+    else renderDashboard();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   function hideNav() { navEl.classList.add('hidden'); }
 
   function go(view) {
+    if (root.App.UITyping) root.App.UITyping.cleanup();
+    if (view === 'typing') { currentApp = 'typing'; setBrand('typing'); renderNav('typing'); return root.App.UITyping.renderHome(); }
     if (view === 'dashboard') renderDashboard();
     else if (view === 'map') renderMap();
     else if (view === 'rewards') renderRewards();
@@ -242,6 +276,8 @@
 
   // ---------- dashboard ----------
   function renderDashboard() {
+    currentApp = 'math';
+    setBrand('math');
     renderNav('dashboard');
     var t = Engine.titleFor(state.lifetimePoints);
     var next = Engine.nextUpLevel(state);
@@ -729,6 +765,23 @@
         }).join('') + '</div>' +
         '<button class="btn small danger mt-1" id="clear-photos">Clear photos</button></div>' : '') +
 
+      (function () {
+        var TY = root.App.UITyping;
+        if (!TY) return '';
+        var ts = TY.tstate(state);
+        var done = root.App.Typing.STAGES.filter(function (st) { return TY.stageDone(state, st.id); }).length;
+        var weak = TY.weakKeys(state, 6);
+        return '<div class="card mt-2"><h3>⌨️ Typing progress</h3>' +
+          '<p>Level <strong>' + done + ' / ' + root.App.Typing.STAGES.length + '</strong> complete' +
+          (ts.bestWpm ? ' · best speed <strong>' + ts.bestWpm + ' wpm</strong>' : '') +
+          ' · <strong>' + (ts.totalChars || 0) + '</strong> characters typed.</p>' +
+          (weak.length
+            ? '<p>Keys still being missed: ' + weak.map(function (k) { return '<kbd>' + esc(k) + '</kbd>'; }).join(' ') +
+              ' — drills automatically target these.</p>'
+            : '<p class="text-soft">No problem keys flagged yet.</p>') +
+          '</div>';
+      })() +
+
       '<div class="card mt-2"><h3>Placement</h3><p class="text-soft">Re-running placement can only unlock levels, never take mastered ones away. Useful after a break, or if the first run did not reflect what they know.</p>' +
       '<button class="btn small" id="retake-placement">Run placement for ' + esc(state.studentName) + '</button></div>' +
 
@@ -844,6 +897,19 @@
       brand.addEventListener('click', function () {
         if (!state) return;
         if (!state.diagnosticDone) skipPlacement(); else go('dashboard');
+      });
+    }
+
+    if (root.App.UITyping) {
+      root.App.UITyping.init({
+        getState: function () { return state; },
+        setMain: function (html) { mainEl.innerHTML = html; },
+        hideNav: hideNav,
+        renderNav: renderNav,
+        save: save,
+        toast: toast,
+        confetti: confetti,
+        addPoints: function (n) { Engine.addPoints(state, n); }
       });
     }
 
