@@ -67,30 +67,62 @@
   /* Deliberately silly. Humour is the point: these are the reward for
      getting far enough to unlock the letters. */
   var FUNNY_PHRASES = [
+    // soccer — the safest universal obsession
+    'messi scored from the halfway line',
+    'the goalie dived the wrong way again',
+    'we won on penalties somehow',
+    'mbappe is faster than my bus',
+    'my team lost and i am not okay',
+    'that was a red card and you know it',
+    'he juggled the ball forty times',
+    // food
+    'extra hummus on my falafel please',
+    'the pizza was bigger than my head',
+    'who ate the last bagel',
+    'my sandwich fell butter side down',
+    'i put too much hot sauce on it',
+    'sufganiyot taste better warm',
+    'someone finished the shabbat cake',
+    'my mom makes the best matzah ball soup',
+    // school life
+    'the fire drill was during my test',
+    'we had a substitute again',
+    'a snow day would be nice right now',
+    'i left my homework in my locker',
+    'the class hamster escaped again',
+    'gym class was dodgeball and i hid',
+    'my pencil broke three times today',
+    'the bus was late and it was raining',
+    // holidays and home, warm not preachy
+    'my afikomen hiding spot was genius',
+    'purim costumes get wilder every year',
+    'we sang way too loud at dinner',
+    'my little brother won the dreidel game',
+    // games and general silliness
+    'i built a whole castle in minecraft',
+    'my brother deleted my save file',
     'my dog ate a waffle',
     'the goose stole my sandwich',
     'a squid is driving the bus',
     'never trust a sneaky penguin',
-    'my sock has a secret plan',
-    'the cat is judging you',
+    'the cat is judging you right now',
     'bananas do not have knees',
     'a dragon lives in my backpack',
-    'the pickle wants to be famous',
     'my homework was eaten by a robot',
-    'sixty six slimy snails',
-    'a wizard sneezed on the pizza',
     'the moon smells like toast',
     'quiet frogs make the best spies',
-    'my brother is part gremlin'
+    'my squishy collection is out of control'
   ];
 
   /* Placement texts. Each is a pangram, so one pass exercises every letter and
      we get a real per-key accuracy read in about a minute. */
   var PLACEMENT_TEXTS = [
-    'the quick brown fox jumps over the lazy dog.',
-    'sphinx of black quartz, judge my vow.',
-    'jinxed wizards pluck ivy from the big quilt.',
-    'waltz, bad nymph, for quick jigs vex.'
+    'jumpy frogs vex a quizzical goalkeeper watching the big derby.',
+    'wizards quickly vexed the jumpy goalie by faxing him a pizza.',
+    'vexed by a quiz, jack gulped six enormous pizzas with extra falafel.',
+    'my brave dog quickly axed the plan by jumping into six frozen waves.',
+    'quick messi zigzags past six brave defenders, then jabs a lovely winning goal.',
+    'zany kids quickly jog past five brown mules munching extra waffles.'
   ];
 
   function placementText() {

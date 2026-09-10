@@ -21,11 +21,9 @@
   function updateHeaderStats() {
     if (!state) { headerStatsEl.innerHTML = ''; return; }
     var p = Storage.getActiveProfile();
-    var t = Engine.titleFor(state.lifetimePoints);
     headerStatsEl.innerHTML =
       '<button class="stat-chip learner" id="switch-learner" title="Switch learner">' +
       '<span>' + (p ? p.avatar : '🙂') + '</span><span class="num">' + esc(state.studentName) + '</span><span class="swap">⇄</span></button>' +
-      '<div class="stat-chip level"><span>' + t.emoji + '</span><span class="num">' + esc(t.title) + '</span></div>' +
       '<div class="stat-chip points"><span>💎</span><span class="num">' + state.points.toLocaleString() + '</span></div>' +
       '<div class="stat-chip streak"><span>🔥</span><span class="num">' + state.streak.current + '-day streak</span></div>';
     var sw = $('#switch-learner');
@@ -94,11 +92,18 @@
     });
   }
 
+  var BRANDS = {
+    home:   { emoji: '🚀', title: 'Quest', sub: 'Learn it, then master it' },
+    typing: { emoji: '⌨️', title: 'Typing Quest', sub: 'Learn to type without looking' },
+    math:   { emoji: '🧮', title: 'Math Quest', sub: 'Grades 4–7 · Learn it, then master it' }
+  };
+
   function setBrand(app) {
-    var t = $('.brand-title'), sub = $('.brand-sub');
-    if (!t || !sub) return;
-    if (app === 'typing') { t.textContent = 'Typing Quest'; sub.textContent = 'Learn to type without looking'; }
-    else { t.textContent = 'Math Quest'; sub.textContent = 'Grades 4–7 · Learn it, then master it'; }
+    var b = BRANDS[app] || BRANDS.math;
+    var t = $('.brand-title'), sub = $('.brand-sub'), em = $('.brand-emoji');
+    if (t) t.textContent = b.title;
+    if (sub) sub.textContent = b.sub;
+    if (em) em.textContent = b.emoji;
   }
 
   function switchApp(app) {
@@ -126,7 +131,60 @@
     state = Storage.load();
     if (!state) return renderProfilePicker();
     updateHeaderStats();
-    if (!state.diagnosticDone) renderWelcome(); else renderDashboard();
+    renderAppChooser();
+  }
+
+  /* One card on the app chooser: what it is, how far they've got, and the
+     squishy they most recently earned in THAT app's own collection. */
+  function chooseCard(app, emoji, name, done, total, unit, pitch) {
+    var SQ = root.App.Squishies;
+    var latest = SQ.CATALOG[Math.max(0, done - 1)];
+    var pct = total ? Math.round((done / total) * 100) : 0;
+    return '<button class="choose-card ' + app + '" data-go="' + app + '">' +
+      '<span class="choose-emoji">' + emoji + '</span>' +
+      '<span class="choose-name">' + name + '</span>' +
+      '<span class="choose-pitch">' + pitch + '</span>' +
+      '<span class="choose-bar"><span class="choose-bar-fill" style="width:' + pct + '%"></span></span>' +
+      '<span class="choose-sub">' + done + ' / ' + total + ' ' + unit + '</span>' +
+      '<span class="choose-sq">' + SQ.render(latest.id, { locked: done === 0 }) +
+      '<em>' + (done ? 'Newest squishy · ' : 'No squishies yet · ') + done + ' / ' + SQ.total + '</em></span>' +
+      '</button>';
+  }
+
+  /* Neither app is the default. Ask which one they want, every launch. */
+  function renderAppChooser() {
+    hideNav();
+    setBrand('home');
+    var mathDone = unlocksFor('math');
+    var typingDone = unlocksFor('typing');
+    var mathTotal = C.LEVELS.length;
+    var typingTotal = root.App.Typing ? root.App.Typing.STAGES.length : 19;
+
+    mainEl.innerHTML =
+      '<div class="card center">' +
+      '<h1>Hi ' + esc(state.studentName) + '! What are we doing today?</h1>' +
+      '<div class="app-choose">' +
+
+      chooseCard('math', '🧮', 'Math', mathDone, mathTotal, 'levels mastered',
+        mathDone ? 'Pick up where you left off.' : 'Start with what you already know.') +
+      chooseCard('typing', '⌨️', 'Typing', typingDone, typingTotal, 'levels done',
+        typingDone ? 'Get those fingers faster.' : 'Find out how fast you type today.') +
+
+      '</div>' +
+      '<p class="text-soft mt-2">You can switch anytime — the tabs are at the top.</p>' +
+      '</div>';
+
+    $all('.choose-card', mainEl).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var target = btn.getAttribute('data-go');
+        currentApp = target;
+        setBrand(target);
+        if (target === 'typing') { renderNav('typing'); root.App.UITyping.renderHome(); }
+        else if (!state.diagnosticDone) renderWelcome();
+        else renderDashboard();   // renderDashboard restores the nav itself
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
   }
 
   function renderProfilePicker() {
@@ -926,7 +984,7 @@
     if (brand) {
       brand.addEventListener('click', function () {
         if (!state) return;
-        if (!state.diagnosticDone) skipPlacement(); else go('dashboard');
+        renderAppChooser();
       });
     }
 

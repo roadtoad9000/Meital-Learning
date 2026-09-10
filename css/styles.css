@@ -746,3 +746,31 @@ input[type="text"], input[type="number"] { font-family: inherit; }
   background: rgba(124, 92, 255, 0.10); margin-bottom: 4px;
 }
 .tbranch-blurb { font-size: 0.76rem; color: var(--text-soft); padding: 0 10px 6px; }
+
+/* landing chooser: math or typing */
+.app-choose { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; margin-top: 22px; }
+.choose-card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 26px 18px; border-radius: var(--radius); cursor: pointer;
+  border: 3px solid var(--border); background: var(--card); color: var(--text);
+  font-family: inherit; transition: transform .14s ease, border-color .14s ease;
+}
+.choose-card:hover { transform: translateY(-4px); border-color: var(--accent); }
+.choose-emoji { font-size: 3rem; line-height: 1; }
+.choose-name { font-size: 1.35rem; font-weight: 900; }
+.choose-sub { font-size: .82rem; color: var(--text-soft); font-weight: 700; }
+.choose-sq { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.choose-sq .sq { width: 46px; padding: 0; cursor: default; }
+.choose-sq .sq:hover { transform: none; }
+.choose-sq em { font-size: .72rem; color: var(--text-soft); font-style: normal; font-weight: 700; }
+
+.choose-card.math { --choose-tint: var(--accent); }
+.choose-card.typing { --choose-tint: var(--ns); }
+.choose-card:hover, .choose-card:focus-visible { border-color: var(--choose-tint); }
+.choose-pitch { font-size: .88rem; color: var(--text-soft); font-weight: 600; margin-bottom: 4px; }
+.choose-bar {
+  display: block; width: 100%; height: 8px; border-radius: 999px;
+  background: var(--border); overflow: hidden; margin: 4px 0 2px;
+}
+.choose-bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--choose-tint); }
+.choose-sq .sq { width: 62px; }
