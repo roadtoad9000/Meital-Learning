@@ -1,6 +1,10 @@
-/* Service worker: caches the app shell so Math Quest works offline
-   once loaded (no wifi needed on the go). Stale-while-revalidate strategy. */
-var CACHE_NAME = 'math-quest-v3';
+/* Service worker: keeps Math Quest working offline, without ever serving a stale
+   app to someone who has a connection.
+
+   Strategy is network-first for the app's own files: if we can reach the network
+   we use (and re-cache) the fresh copy, so a plain refresh always picks up a new
+   deploy. Cache is the fallback for offline, not the default. */
+var CACHE_NAME = 'math-quest-v4';
 var APP_SHELL = [
   './',
   './index.html',
@@ -18,16 +22,18 @@ var APP_SHELL = [
 
 self.addEventListener('install', function (event) {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(function (cache) { return cache.addAll(APP_SHELL); }).then(function () {
-      return self.skipWaiting();
-    })
+    caches.open(CACHE_NAME)
+      .then(function (cache) { return cache.addAll(APP_SHELL); })
+      .then(function () { return self.skipWaiting(); })
   );
 });
 
 self.addEventListener('activate', function (event) {
   event.waitUntil(
     caches.keys().then(function (keys) {
-      return Promise.all(keys.filter(function (k) { return k !== CACHE_NAME; }).map(function (k) { return caches.delete(k); }));
+      return Promise.all(keys.map(function (k) {
+        return k === CACHE_NAME ? null : caches.delete(k);
+      }));
     }).then(function () { return self.clients.claim(); })
   );
 });
@@ -37,17 +43,21 @@ self.addEventListener('fetch', function (event) {
   if (req.method !== 'GET' || !req.url.startsWith(self.location.origin)) return;
 
   event.respondWith(
-    caches.match(req).then(function (cached) {
-      var fetchPromise = fetch(req).then(function (networkResp) {
-        if (networkResp && networkResp.ok) {
-          var copy = networkResp.clone();
+    fetch(req)
+      .then(function (resp) {
+        if (resp && resp.ok) {
+          var copy = resp.clone();
           caches.open(CACHE_NAME).then(function (cache) { cache.put(req, copy); });
         }
-        return networkResp;
-      }).catch(function () {
-        return cached || (req.mode === 'navigate' ? caches.match('./index.html') : undefined);
-      });
-      return cached || fetchPromise;
-    })
+        return resp;
+      })
+      .catch(function () {
+        // Offline: fall back to whatever we cached last time.
+        return caches.match(req).then(function (cached) {
+          if (cached) return cached;
+          if (req.mode === 'navigate') return caches.match('./index.html');
+          return Response.error();
+        });
+      })
   );
 });
