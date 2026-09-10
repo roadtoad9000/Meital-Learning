@@ -1,125 +1,127 @@
 # Meital's Math Quest 🧮
 
-An adaptive, mastery-based 7th grade math practice app for Meital, modeled on the
+An adaptive, mastery-based math tutor for Meital, modeled on the
 [Alpha School](https://alpha.school) learning methodology and aligned to the
-[Massachusetts Curriculum Framework for Mathematics](https://www.doe.mass.edu/frameworks/current.html), Grade 7.
+[Massachusetts Curriculum Framework for Mathematics](https://www.doe.mass.edu/frameworks/current.html).
 
-No install, no account, no server required — it's a single static web app that
-runs entirely in the browser and saves progress locally.
+**It teaches, it doesn't just quiz.** Every level opens with a lesson — the idea,
+the method, and a worked example you step through — before a single question is
+asked.
 
-## How it works (and how it maps to Alpha School)
+No install, no account, no server. A single static web app that runs entirely in
+the browser and saves progress on the device.
 
-| Alpha School idea | This app |
-| --- | --- |
-| AI tutor picks the right difficulty so students succeed ~80–85% of the time (zone of proximal development) | The adaptive engine picks question difficulty per skill based on current mastery, with some randomness to keep it a little unpredictable and interesting |
-| ≥90% mastery required before moving on | Each of 20 skills has a 0–100% mastery score; a skill is "Mastered" at 85%+ and correct/incorrect answers move it up or down |
-| Short focused sessions (25-min "Pomodoros") that close a Progress Ring | Practice happens in 8-question "Sprints" per domain; 5 Apple-Watch-style Progress Rings show mastery per math domain |
-| "Alpha Bucks" — points redeemable for real rewards | "Points" (💎) are earned per correct answer (more for harder questions and answer streaks), redeemable in the Rewards Shop for rewards a parent configures |
-| Guides track motivational levers per student | A Parent Zone lets a grown-up edit rewards, mark redemptions fulfilled, adjust the daily sprint goal, and see a full per-skill progress report |
+## The core idea: find the real gaps, then fill them
 
-## The 5 Grade 7 math domains (20 skills total)
+Alpha's tutor "identifies missing prerequisites and gives each student the lesson
+they actually need, **even if that means fifth-grade material for a seventh
+grader**." That is the model here.
 
-Based on the MA Curriculum Framework's four critical areas for Grade 7, split into 5 domains:
+Meital is *starting* 7th grade, so testing her on 7th grade content would mostly
+measure what she hasn't been taught yet. Instead:
 
-- **⚖️ Ratios & Proportional Relationships** — unit rates, proportional relationships, percent problems (tax/tip/discount/growth), scale drawings
-- **🔢 The Number System** — adding/subtracting integers, multiplying/dividing integers, operations with fractions & decimals, absolute value
-- **🧮 Expressions & Equations** — simplifying expressions, two-step equations, word problems → equations, inequalities
-- **📐 Geometry** — circles (area/circumference), area of composite figures, volume & surface area, angle relationships
-- **🎲 Statistics & Probability** — mean/median/range, simple probability, compound probability, comparing data sets
+1. **Placement searches downward.** For each strand it binary-searches the
+   prerequisite ladder to find the highest level she can actually do — dropping
+   into Grade 6, 5, or 4 material as needed. ~13–18 questions, and there's a
+   **"Haven't learned this yet"** button so she never has to guess.
+2. **Anything she already knows is skipped.** No grinding through material she's
+   demonstrated.
+3. **Everything above that gets taught**, lowest gap first — because a Grade 5
+   gap will sabotage Grade 7 work until it's closed.
 
-Every question is **procedurally generated** with randomized numbers (not a fixed
-bank), so practice is effectively unlimited and never repeats exactly.
+## The teaching flow
 
-## The flow
+Each level runs: **Lesson → Guided practice → Practice to mastery.**
 
-1. **Placement Quiz** (first run only) — one question per skill (20 total) sets a
-   starting mastery estimate for every skill.
-2. **Dashboard** — shows Meital's level/title, points, streak, today's goal, a
-   recommended sprint (auto-picks the domain that needs the most work), and the
-   5 mastery rings. Any ring/domain can also be picked manually.
-3. **Sprint** — 8 adaptive questions from the chosen domain, weighted toward
-   weaker skills. Immediate feedback + worked explanation after every question.
-   Confetti + a badge toast on skill mastery.
-4. **Progress Report** — a full table of all 20 skills: mastery %, status,
-   attempts, accuracy, last practiced.
-5. **Rewards Shop** — spend points on rewards a parent has configured.
-6. **Parent Zone** — add/remove rewards, mark redemptions fulfilled, set the
-   daily sprint goal, view the danger-zone reset.
+- **Lesson** — the idea in plain language, the method as numbered steps, and a
+  worked example revealed one step at a time.
+- **Practice** — with a **💡 Hint** button (re-shows the method) and
+  **📖 Show the lesson again**, always available.
+- **A wrong answer is a teaching moment**, not a scold: it shows the full worked
+  solution for *that* problem plus a reminder of the method, then hands her a
+  fresh one.
+- **Mastery is demonstrated, not guessed:** 4 correct in a row. Progress shows as
+  pips so she can see how close she is. Mastering a level unlocks the next one.
 
-## Points, streaks & badges
+## The ladder — 33 levels, Grades 4 → 7
 
-- Points scale with question difficulty (10/20/30 for Warm-Up/On Level/Challenge)
-  plus a streak bonus for consecutive correct answers within a sprint.
-- Mastering a skill mid-sprint awards a bonus; completing a sprint always earns a
-  small participation bonus.
-- A daily streak (🔥) increments once per calendar day with at least one
-  completed sprint.
-- 12 badges include per-domain "Champion" badges, a grand "Grade 7 Math Master"
-  badge, streak badges, a "Perfect Sprint" badge, and a "Comeback Kid" badge for
-  mastering something that was wrong on the placement quiz.
+| Strand | Levels | Spans |
+| --- | --- | --- |
+| 🔟 Whole Numbers | Multi-digit multiplication → division | G4–5 |
+| 🍕 Fractions & Decimals | Equivalent fractions → negative fractions | G4–7 |
+| 🌡️ Negative Numbers | Absolute value → multiplying/dividing integers | G6–7 |
+| ⚖️ Ratios & Percents | Ratios → percent applications, scale drawings | G6–7 |
+| 🧮 Expressions & Equations | Order of operations → inequalities | G5–7 |
+| 📐 Geometry | Area of rectangles → surface area & composite figures | G4–7 |
+| 🎲 Data & Probability | Mean/median/range → compound probability | G6–7 |
+
+Every question is **procedurally generated**, so practice never runs out and
+never repeats exactly.
+
+## Motivation (the Alpha-style layer)
+
+- **Points** scale with grade level, plus a streak bonus for consecutive correct answers.
+- **Daily streak** 🔥 for practicing on consecutive days.
+- **17 badges** — strand champions, "Grade 5/6/7 Cleared", Comeback Kid (mastering
+  something missed on placement), and more.
+- **🧸 Squish Collection** — mastering a level earns a collectible squishy (she's
+  deep in a Nee Doh phase). Tap them; they squish.
+- **Rewards Shop** — points buy real-world rewards a parent configures.
+
+## For parents
+
+**Parent Zone → "Where She Actually Is"** shows the **knowledge grade** per strand:
+the highest grade fully mastered. Anything below Grade 7 is a real gap the app is
+actively teaching. Below that, a per-level table with status, attempts and accuracy.
+
+Also in Parent Zone: add/remove rewards, mark redemptions fulfilled, set the daily
+goal, back up/restore progress, and reset.
 
 ## Running it on iPad / iPhone
 
-The app is a installable **Progressive Web App** — it works fully offline once
-loaded, gets its own home screen icon, and opens full-screen (no Safari
-address bar) just like a native app.
+It's an installable **PWA** — works offline once loaded, gets a home screen icon,
+opens full-screen.
 
-1. **Host it somewhere Safari can reach.** Easiest option: enable **GitHub
-   Pages** for this repo — go to the repo's **Settings → Pages**, and under
-   "Build and deployment" choose **Deploy from a branch**, then pick this
-   branch (`claude/meital-math-learning-app-zc6yuo`, or `main` if/once this is
-   merged) and the `/ (root)` folder. Save. GitHub gives you a URL like
-   `https://<username>.github.io/<repo>/` — that's the link Meital opens on
-   her device. (This one step needs a human with repo access — it can't be
-   done from here.)
-2. **On her iPad/iPhone**, open that URL in **Safari** (must be Safari, not
-   Chrome, for the "Add to Home Screen" install step to work).
-3. Tap the **Share** icon (square with an arrow) → **Add to Home Screen** →
-   **Add**. A "Math Quest" icon now sits on her home screen and opens full
-   screen, like any other app.
-4. After the first visit, it keeps working **without wifi or data** — every
-   file is cached locally, so it's fine in the car, on a plane, or anywhere
-   with spotty signal.
+1. **Host it.** GitHub Pages (Settings → Pages → deploy from this branch) works if
+   the repo is public; on a free plan a private repo can't use Pages, so
+   [Netlify Drop](https://app.netlify.com/drop) is the easy alternative — drag the
+   folder on, get a URL, code stays private.
+2. **On her device**, open the URL in **Safari**.
+3. **Share → Add to Home Screen → Add.**
+4. After the first load it works **with no wifi or data**.
 
-You can also just open the hosted URL in mobile Safari directly without
-installing it — it works the same either way, installing just makes it feel
-more like a real app and skips the browser chrome.
-
-## Running it locally / on desktop
-
-Everything (HTML/CSS/vanilla JS) is self-contained with no build step and no
-external dependencies. Just open `index.html` in a browser, or serve the
-folder with any static file server:
+### Running locally
 
 ```bash
+cd Meital-Learning
 python3 -m http.server 8080
 # then open http://localhost:8080
 ```
 
-Progress is saved in the browser's `localStorage`, scoped to whatever
-device/browser it's opened in — no login, no backend, no data leaves the
-device. If Meital uses more than one device (say, her iPad at home and an
-iPhone out and about), use **Parent Zone → Backup & Transfer** to download a
-backup on one device and restore it on the other to bring progress along.
+To try it on her iPad over the same wifi, find your computer's IP
+(`ipconfig getifaddr en0` on a Mac) and visit `http://THAT-IP:8080`. Note that
+offline mode only activates over HTTPS or localhost, so the LAN address won't cache.
 
 ## Customizing
 
-- **Rewards**: Parent Zone → Manage Rewards. Add/remove anything — screen time,
-  treats, allowance, family activities — at whatever point cost feels right.
-- **Daily goal**: Parent Zone → Daily Goal (default: 2 sprints/day).
-- **Adding more skills/question types**: each skill is one generator function in
-  `js/questions.js` (see the `GENERATORS` map at the bottom); add a new entry
-  there and to the `SKILLS` array to introduce a new skill.
-- **Reset progress**: Parent Zone → Danger Zone (irreversible).
+- **Rewards / daily goal / reset**: Parent Zone.
+- **Moving between devices**: Parent Zone → Backup & Transfer (progress is saved
+  per-device in `localStorage`, and never leaves the device).
+- **Adding levels**: each is one entry in `js/curriculum.js` with a `lesson`
+  (idea, steps, worked examples) and a `gen()` question generator. Add it to the
+  right strand in ladder order and everything else — gating, placement, the map —
+  picks it up automatically.
 
-## File structure
+## Files
 
 ```
-index.html         Page shell + nav
-css/styles.css      All styling (light/dark aware, mobile responsive)
-js/questions.js     Procedural question generators for all 20 skills
+index.html          Page shell
+manifest.json       PWA manifest
+sw.js               Service worker (offline support)
+css/styles.css      All styling (light/dark, mobile-first)
+js/curriculum.js    The 33-level ladder: lessons + question generators
 js/storage.js       localStorage persistence
-js/engine.js        Adaptive difficulty, mastery updates, points, badges, levels
-js/ui.js            All view rendering + event wiring
-js/main.js          Bootstraps the app on page load
+js/engine.js        Placement search, prerequisite gating, mastery, points, badges
+js/ui.js            Lesson view, practice flow, dashboard, map, parent zone
+js/main.js          Bootstrap
 ```

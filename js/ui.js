@@ -1,66 +1,40 @@
-/* UI layer: renders views into #app-main, wires up interactions. Vanilla JS, no framework. */
+/* UI layer. Teach-first flow: Lesson → guided practice with hints → practice to mastery. */
 (function (root) {
-  var Q = root.App.Questions;
+  var C = root.App.Curriculum;
   var Engine = root.App.Engine;
   var Storage = root.App.Storage;
 
   var state = null;
   var mainEl, navEl, headerStatsEl;
-  var sprintCtx = null;
-  var diagCtx = null;
+  var session = null;
+  var diag = null;
 
-  function $(sel, ctx) { return (ctx || document).querySelector(sel); }
-  function $all(sel, ctx) { return Array.prototype.slice.call((ctx || document).querySelectorAll(sel)); }
-  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function $(s, c) { return (c || document).querySelector(s); }
+  function $all(s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function save() { Storage.save(state); updateHeaderStats(); }
 
-  function saveState() { Storage.save(state); updateHeaderStats(); }
-
-  // ---------- header ----------
   function updateHeaderStats() {
-    var lvl = Engine.levelFor(state.lifetimePoints);
+    var t = Engine.titleFor(state.lifetimePoints);
     headerStatsEl.innerHTML =
-      '<div class="stat-chip level">' + lvl.emoji + ' <span class="num">' + esc(lvl.title) + '</span></div>' +
-      '<div class="stat-chip points">💎 <span class="num">' + state.points.toLocaleString() + '</span></div>' +
+      '<div class="stat-chip level"><span>' + t.emoji + '</span><span class="num">' + esc(t.title) + '</span></div>' +
+      '<div class="stat-chip points"><span>💎</span><span class="num">' + state.points.toLocaleString() + '</span></div>' +
       '<div class="stat-chip streak"><span>🔥</span><span class="num">' + state.streak.current + '-day streak</span></div>';
   }
 
-  // ---------- shared widgets ----------
-  function svgRing(pct, color, size, label) {
-    size = size || 90;
-    var stroke = size * 0.11;
-    var r = (size - stroke) / 2;
-    var c = 2 * Math.PI * r;
-    var offset = c * (1 - Math.max(0, Math.min(100, pct)) / 100);
-    return (
-      '<svg class="ring-svg" width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' +
-      '<circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" stroke="var(--border)" stroke-width="' + stroke + '" fill="none"/>' +
-      '<circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" stroke="' + color + '" stroke-width="' + stroke + '" fill="none" ' +
-      'stroke-linecap="round" stroke-dasharray="' + c + '" stroke-dashoffset="' + offset + '" transform="rotate(-90 ' + size / 2 + ' ' + size / 2 + ')"/>' +
-      '<text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" font-size="' + size * 0.24 + '" font-weight="800" fill="currentColor">' + Math.round(pct) + '%</text>' +
-      '</svg>'
-    );
+  function toast(msg) {
+    var t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 2400);
   }
 
-  function domainRingGrid(clickable) {
-    return '<div class="ring-grid">' + Q.DOMAINS.map(function (d) {
-      var pct = Engine.domainMastery(state, d.id);
-      return '<div class="ring-card" data-domain="' + d.id + '" style="' + (clickable ? 'cursor:pointer' : 'cursor:default') + '">' +
-        svgRing(pct, d.color, 84) +
-        '<div class="domain-name">' + d.emoji + ' ' + esc(d.short) + '</div>' +
-        '<div class="domain-pct">' + pct + '% mastered</div>' +
-        '</div>';
-    }).join('') + '</div>';
-  }
-
-  function badgeShelf() {
-    return '<div class="badge-shelf">' + Engine.BADGES.map(function (b) {
-      var earned = state.badges.indexOf(b.id) !== -1;
-      return '<div class="badge-pill' + (earned ? '' : ' locked') + '" title="' + esc(b.desc) + (earned ? '' : ' (locked)') + '">' +
-        '<span class="emoji">' + b.emoji + '</span> ' + esc(b.name) + '</div>';
-    }).join('') + '</div>';
-  }
-
-  function confettiBurst() {
+  function confetti() {
     var overlay = document.createElement('div');
     overlay.className = 'confetti-overlay';
     var colors = ['#ff6b6b', '#ffa62b', '#00b894', '#00b8d9', '#6c5ce7', '#ff6b9d'];
@@ -77,89 +51,31 @@
     setTimeout(function () { overlay.remove(); }, 3200);
   }
 
-  function toast(msg) {
-    var t = document.createElement('div');
-    t.className = 'toast';
-    t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(function () { t.remove(); }, 2400);
-  }
-
-  var BLOB_SHAPES = [
-    '42% 58% 63% 37% / 41% 44% 56% 59%',
-    '58% 42% 35% 65% / 55% 40% 60% 45%',
-    '65% 35% 46% 54% / 35% 60% 40% 65%',
-    '40% 60% 55% 45% / 60% 35% 65% 40%',
-    '55% 45% 40% 60% / 45% 60% 35% 65%'
-  ];
-  var BOOP_MESSAGES = ['Squish squish! 🟣', 'Boop!', '*squoosh*', 'Ooh, satisfying.', 'Neeeee-doh!'];
-
-  function squishyCollection() {
-    var unlockedCount = Q.SKILLS.filter(function (s) { return state.skills[s.id].mastery >= Engine.MASTERY_THRESHOLD; }).length;
-    var cells = Q.SKILLS.map(function (s, i) {
-      var d = Q.DOMAIN_MAP[s.domain];
-      var unlocked = state.skills[s.id].mastery >= Engine.MASTERY_THRESHOLD;
-      var shape = BLOB_SHAPES[i % BLOB_SHAPES.length];
-      var style = 'border-radius:' + shape + (unlocked ? ';background:' + d.color : '');
-      var titleText = unlocked ? (s.name + ' squishy — collected!') : ('Master ' + s.name + ' to unlock this squishy');
-      return '<div class="squishy-cell">' +
-        '<div class="squishy ' + (unlocked ? 'unlocked' : 'locked') + '" data-squishy="' + s.id + '" style="' + style + '" title="' + esc(titleText) + '">' +
-        (unlocked ? '' : '<span class="squishy-lock">🔒</span>') +
-        '</div>' +
-        '<div class="squishy-name">' + esc(d.short) + '</div>' +
-        '</div>';
-    }).join('');
-    return '<div class="card">' +
-      '<div class="section-title"><h2>🧸 Squish Collection</h2><span class="text-soft">' + unlockedCount + ' / ' + Q.SKILLS.length + ' collected</span></div>' +
-      '<p>Every skill you master unlocks a new squishy for your collection.</p>' +
-      '<div class="squishy-grid">' + cells + '</div>' +
-      '</div>';
-  }
-
-  function wireSquishies(container) {
-    $all('.squishy.unlocked', container).forEach(function (el) {
-      el.addEventListener('click', function () {
-        el.classList.remove('squish-pop');
-        void el.offsetWidth;
-        el.classList.add('squish-pop');
-      });
-    });
-    $all('.squishy.locked', container).forEach(function (el) {
-      el.addEventListener('click', function () { toast('Master that skill to unlock its squishy! 🔒'); });
-    });
-  }
-
-  function statusForMastery(m) {
-    if (m >= Engine.MASTERY_THRESHOLD) return { label: 'Mastered', cls: 'status-mastered' };
-    if (m >= 60) return { label: 'Proficient', cls: 'status-proficient' };
-    if (m >= 35) return { label: 'Developing', cls: 'status-developing' };
-    return { label: 'Not Started', cls: 'status-new' };
+  function gradeChip(grade) {
+    return '<span class="grade-chip g' + grade + '">Grade ' + grade + '</span>';
   }
 
   // ---------- nav ----------
-  var NAV_ITEMS = [
-    { id: 'dashboard', label: '🏠 Dashboard' },
-    { id: 'progress', label: '📊 Progress Report' },
-    { id: 'rewards', label: '🎁 Rewards Shop' },
+  var NAV = [
+    { id: 'dashboard', label: '🏠 Home' },
+    { id: 'map', label: '🗺️ Skill Map' },
+    { id: 'rewards', label: '🎁 Rewards' },
     { id: 'parent', label: '👪 Parent Zone' }
   ];
-
   function renderNav(active) {
     navEl.classList.remove('hidden');
-    navEl.innerHTML = NAV_ITEMS.map(function (n) {
+    navEl.innerHTML = NAV.map(function (n) {
       return '<button class="nav-btn' + (n.id === active ? ' active' : '') + '" data-view="' + n.id + '">' + n.label + '</button>';
     }).join('');
-    $all('.nav-btn', navEl).forEach(function (btn) {
-      btn.addEventListener('click', function () { go(btn.getAttribute('data-view')); });
+    $all('.nav-btn', navEl).forEach(function (b) {
+      b.addEventListener('click', function () { go(b.getAttribute('data-view')); });
     });
   }
-
   function hideNav() { navEl.classList.add('hidden'); }
 
-  // ---------- router ----------
-  function go(view, params) {
+  function go(view) {
     if (view === 'dashboard') renderDashboard();
-    else if (view === 'progress') renderProgress();
+    else if (view === 'map') renderMap();
     else if (view === 'rewards') renderRewards();
     else if (view === 'parent') renderParentGate();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -170,76 +86,258 @@
     hideNav();
     mainEl.innerHTML =
       '<div class="card welcome-hero">' +
-      '<div class="big-emoji">🚀🧮</div>' +
-      '<h1>Welcome, ' + esc(state.studentName) + "'s Math Quest!" + '</h1>' +
-      '<p>This is your own adaptive 7th-grade math trainer, built like the Alpha School model: short focused sprints, questions that grow with you, and real rewards for real mastery.</p>' +
-      '<p>First, a quick <strong>Placement Quiz</strong> (about 20 questions, one per skill) so your quest can be built just for you. Answer your best &mdash; it is okay to not know some yet!</p>' +
-      '<button class="btn" id="start-diag-btn">Start My Placement Quiz →</button>' +
+      '<div class="big-emoji">🚀</div>' +
+      '<h1>Hi ' + esc(state.studentName) + '!</h1>' +
+      '<p>This is your own math tutor. It doesn\'t just quiz you — it <strong>teaches you</strong> each thing first, then practices with you until you\'ve really got it.</p>' +
+      '<div class="callout">' +
+      '<strong>First, a quick placement.</strong> It starts easy and adjusts to you. Its only job is to find your starting line — so it will keep going until it finds things you <em>haven\'t</em> learned yet. That is completely normal and it is not a test. Nobody is graded on this.' +
+      '</div>' +
+      '<p class="text-soft">About ' + Engine.diagnosticTotalEstimate() + ' questions, 5 minutes. If you see something you\'ve never been taught, just tap <strong>"Haven\'t learned this yet"</strong> and it moves on.</p>' +
+      '<button class="btn" id="start-diag">Find My Starting Line →</button>' +
       '</div>';
-    $('#start-diag-btn').addEventListener('click', startDiagnostic);
+    $('#start-diag').addEventListener('click', startDiagnostic);
   }
 
-  // ---------- diagnostic ----------
+  // ---------- placement ----------
   function startDiagnostic() {
-    diagCtx = { questions: Engine.buildDiagnostic(state), idx: 0, correctCount: 0 };
+    diag = Engine.newDiagnostic();
     renderDiagQuestion();
   }
 
   function renderDiagQuestion() {
     hideNav();
-    var q = diagCtx.questions[diagCtx.idx];
-    var pct = Math.round((diagCtx.idx / diagCtx.questions.length) * 100);
+    var level = Engine.diagnosticCurrentLevel(diag);
+    if (!level || diag.done) return finishDiagnostic();
+    var q = Engine.questionFor(level.id);
+    var strand = Engine.STRAND_MAP[level.strand];
+    var est = Engine.diagnosticTotalEstimate();
+    var pct = Math.min(95, Math.round((diag.asked / est) * 100));
     mainEl.innerHTML =
       '<div class="card">' +
-      '<div class="quiz-meta"><span>Placement Quiz — ' + Q.SKILL_MAP[q.skill].name + '</span><span>' + (diagCtx.idx + 1) + ' / ' + diagCtx.questions.length + '</span></div>' +
+      '<div class="quiz-meta"><span>' + strand.emoji + ' ' + esc(strand.name) + '</span>' + gradeChip(level.grade) + '</div>' +
       '<div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:' + pct + '%"></div></div>' +
       '<div class="question-prompt">' + esc(q.prompt) + '</div>' +
       '<div id="answer-zone"></div>' +
+      '<button class="btn secondary small mt-2" id="not-learned">🤷 Haven\'t learned this yet</button>' +
       '</div>';
-    renderAnswerZone(q, function (correct) {
-      Engine.recordDiagnosticAnswer(state, q.skill, correct);
-      diagCtx.idx += 1;
-      if (correct) diagCtx.correctCount += 1;
+
+    function proceed(correct) {
+      Engine.diagnosticAnswer(diag, correct);
       setTimeout(function () {
-        if (diagCtx.idx >= diagCtx.questions.length) finishDiagnostic();
-        else renderDiagQuestion();
-      }, 550);
-    }, { quickFeedback: true });
+        if (diag.done) finishDiagnostic(); else renderDiagQuestion();
+      }, 450);
+    }
+    renderAnswerZone(q, proceed, { mode: 'placement' });
+    $('#not-learned').addEventListener('click', function () {
+      $('#not-learned').disabled = true;
+      $('#answer-zone').innerHTML = '<div class="feedback-panel neutral"><div class="feedback-title">👍 Good to know — that just tells us where to start.</div></div>';
+      proceed(false);
+    });
   }
 
   function finishDiagnostic() {
-    var res = Engine.completeDiagnostic(state, diagCtx.correctCount > 0);
-    saveState();
-    var domains = Q.DOMAINS.map(function (d) { return { d: d, pct: Engine.domainMastery(state, d.id) }; });
-    domains.sort(function (a, b) { return a.pct - b.pct; });
-    var weakest = domains[0];
+    var res = Engine.applyDiagnostic(state, diag);
+    save();
+    var rows = C.STRANDS.map(function (s) {
+      var kg = Engine.knowledgeGrade(state, s.id);
+      var cur = Engine.currentLevel(state, s.id);
+      return '<div class="place-row">' +
+        '<span class="place-strand">' + s.emoji + ' ' + esc(s.name) + '</span>' +
+        '<span class="place-next">' + (cur ? 'Starting at: <strong>' + esc(cur.name) + '</strong> ' + gradeChip(cur.grade) : '<strong>All done! 🎉</strong>') + '</span>' +
+        '</div>';
+    }).join('');
     hideNav();
     mainEl.innerHTML =
-      '<div class="card center">' +
-      '<div class="big-emoji">🎉</div>' +
-      '<h1>Placement Complete!</h1>' +
-      '<p>You got ' + diagCtx.correctCount + ' out of ' + diagCtx.questions.length + ' correct on first try &mdash; and that is just the starting line. Here is your starting map:</p>' +
-      domainRingGrid(false) +
-      '<p class="mt-2">Your quest will focus first on <strong>' + weakest.d.name + '</strong> (' + weakest.pct + '%), but you can practice any area anytime.</p>' +
-      '<button class="btn mt-2" id="to-dashboard-btn">Go to My Dashboard →</button>' +
+      '<div class="card">' +
+      '<div class="center"><div class="big-emoji">🗺️</div><h1>Here\'s Your Starting Line</h1></div>' +
+      '<p class="center">You already know <strong>' + res.placedCount + '</strong> of the ' + (res.placedCount + res.gapCount) + ' skills in here — so we\'ll skip straight past those. The other <strong>' + res.gapCount + '</strong> are what we\'ll teach you, starting from the easiest.</p>' +
+      '<div class="place-list mt-2">' + rows + '</div>' +
+      '<div class="callout mt-2">Every one of those starts with a <strong>lesson</strong> — you\'ll never get thrown a question about something you haven\'t been taught.</div>' +
+      '<div class="center mt-2"><button class="btn" id="to-dash">Let\'s Go →</button></div>' +
       '</div>';
-    $('#to-dashboard-btn').addEventListener('click', function () { go('dashboard'); });
-    if (res.newBadges.length) setTimeout(function () { announceBadges(res.newBadges); }, 400);
+    $('#to-dash').addEventListener('click', function () { go('dashboard'); });
   }
 
-  // ---------- answer zone (shared by diagnostic + sprint) ----------
+  // ---------- dashboard ----------
+  function renderDashboard() {
+    renderNav('dashboard');
+    var t = Engine.titleFor(state.lifetimePoints);
+    var next = Engine.nextUpLevel(state);
+    var goal = state.dailyGoal;
+
+    var strandCards = C.STRANDS.map(function (s) {
+      var p = Engine.strandProgress(state, s.id);
+      var cur = Engine.currentLevel(state, s.id);
+      return '<div class="strand-card" data-strand="' + s.id + '">' +
+        '<div class="strand-head"><span>' + s.emoji + '</span> <strong>' + esc(s.name) + '</strong></div>' +
+        '<div class="bar-bg"><span class="bar-fill" style="width:' + p.pct + '%;background:' + s.color + '"></span></div>' +
+        '<div class="strand-sub">' + p.done + ' / ' + p.total + ' mastered' + (cur ? ' · next: ' + esc(cur.name) : ' · complete 🎉') + '</div>' +
+        '</div>';
+    }).join('');
+
+    mainEl.innerHTML =
+      '<div class="grid" style="gap:16px;">' +
+      (next ?
+        '<div class="card next-up">' +
+        '<div class="next-label">📚 NEXT LESSON</div>' +
+        '<h2>' + esc(next.name) + ' ' + gradeChip(next.grade) + '</h2>' +
+        '<p>' + esc(next.lesson.idea.split('.')[0]) + '.</p>' +
+        '<button class="btn block" id="start-next">' + (state.levels[next.id].lessonSeen ? 'Keep Practicing →' : 'Teach Me This →') + '</button>' +
+        '</div>'
+        :
+        '<div class="card center"><div class="big-emoji">🏆</div><h2>Everything mastered!</h2><p>You have finished every level from Grade 4 through Grade 7.</p></div>') +
+      '<div class="card">' +
+      '<div class="section-title"><h2>Hi ' + esc(state.studentName) + '! ' + t.emoji + '</h2><span class="text-soft">' + esc(t.title) + '</span></div>' +
+      '<p>Today\'s goal: <strong>' + goal.sessionsToday + ' / ' + goal.target + '</strong> sessions' + (goal.goalMet ? ' ✅' : '') + '</p>' +
+      '</div>' +
+      '<div class="card"><h2>Your Skill Strands</h2><div class="strand-grid">' + strandCards + '</div></div>' +
+      '<div class="card"><h2>Badges</h2>' + badgeShelf() + '</div>' +
+      squishyCollection() +
+      '</div>';
+
+    if (next) $('#start-next').addEventListener('click', function () { startLevel(next.id); });
+    $all('.strand-card', mainEl).forEach(function (c) {
+      c.addEventListener('click', function () {
+        var cur = Engine.currentLevel(state, c.getAttribute('data-strand'));
+        if (cur) startLevel(cur.id); else toast('That strand is fully mastered! 🎉');
+      });
+    });
+    wireSquishies(mainEl);
+  }
+
+  // ---------- LESSON ----------
+  function startLevel(levelId) {
+    var ls = state.levels[levelId];
+    session = { levelId: levelId, asked: 0, correct: 0, pointsEarned: 0, combo: 0, mastered: false, missed: false, guidedLeft: Engine.GUIDED_COUNT };
+    if (!ls.lessonSeen) renderLesson(levelId, 0);
+    else renderQuestion();
+  }
+
+  function renderLesson(levelId, exampleStep) {
+    hideNav();
+    var lv = Engine.LEVEL_MAP[levelId];
+    var strand = Engine.STRAND_MAP[lv.strand];
+    var ex = lv.lesson.examples[0];
+    var shown = Math.min(exampleStep, ex.steps.length);
+
+    var stepsHtml = ex.steps.slice(0, shown).map(function (s, i) {
+      return '<div class="work-step"><span class="step-num">' + (i + 1) + '</span><span>' + esc(s) + '</span></div>';
+    }).join('');
+
+    var allShown = shown >= ex.steps.length;
+
+    mainEl.innerHTML =
+      '<div class="card lesson">' +
+      '<div class="quiz-meta"><span>' + strand.emoji + ' ' + esc(strand.name) + '</span>' + gradeChip(lv.grade) + '</div>' +
+      '<h1>' + esc(lv.name) + '</h1>' +
+
+      '<div class="lesson-idea"><div class="lesson-h">💡 The idea</div><p>' + esc(lv.lesson.idea) + '</p></div>' +
+
+      '<div class="lesson-h mt-2">📋 How to do it</div>' +
+      '<ol class="method-list">' + lv.lesson.steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' +
+
+      '<div class="worked-example mt-2">' +
+      '<div class="lesson-h">✏️ Worked example</div>' +
+      '<div class="we-problem">' + esc(ex.problem) + '</div>' +
+      '<div id="we-steps">' + stepsHtml + '</div>' +
+      (allShown ? '<div class="we-answer">✅ Answer: <strong>' + esc(ex.answer) + '</strong></div>' : '') +
+      '</div>' +
+
+      '<div class="mt-2">' +
+      (allShown
+        ? '<button class="btn block" id="lesson-done">I\'m Ready to Try It →</button>'
+        : '<button class="btn block" id="next-step">' + (shown === 0 ? 'Show Me Step 1 →' : 'Next Step →') + '</button>') +
+      '</div>' +
+      '<button class="btn secondary small block mt-1" id="back-dash">Back to Home</button>' +
+      '</div>';
+
+    if (allShown) {
+      $('#lesson-done').addEventListener('click', function () {
+        state.levels[levelId].lessonSeen = true;
+        save();
+        var earned = Engine.checkBadges(state, { lessonCompleted: true });
+        if (earned.length) announce(earned);
+        renderQuestion();
+      });
+    } else {
+      $('#next-step').addEventListener('click', function () { renderLesson(levelId, shown + 1); });
+    }
+    $('#back-dash').addEventListener('click', function () { go('dashboard'); });
+  }
+
+  // ---------- PRACTICE ----------
+  function renderQuestion() {
+    hideNav();
+    var levelId = session.levelId;
+    var lv = Engine.LEVEL_MAP[levelId];
+    var ls = state.levels[levelId];
+    var strand = Engine.STRAND_MAP[lv.strand];
+    var q = Engine.questionFor(levelId);
+    var guided = session.guidedLeft > 0;
+
+    var pips = '';
+    for (var i = 0; i < Engine.MASTERY_STREAK; i++) {
+      pips += '<span class="pip' + (i < ls.streak ? ' on' : '') + '"></span>';
+    }
+
+    mainEl.innerHTML =
+      '<div class="card">' +
+      '<div class="quiz-meta">' +
+      '<span>' + strand.emoji + ' ' + esc(lv.name) + '</span>' +
+      (guided ? '<span class="difficulty-pill d1">Guided</span>' : '') +
+      gradeChip(lv.grade) +
+      '</div>' +
+      '<div class="mastery-track"><span class="mastery-label">' + ls.streak + ' / ' + Engine.MASTERY_STREAK + ' in a row to master</span><span class="pips">' + pips + '</span></div>' +
+      '<div class="question-prompt">' + esc(q.prompt) + '</div>' +
+      '<div id="answer-zone"></div>' +
+      '<div class="quiz-actions mt-2">' +
+      '<button class="btn secondary small" id="hint-btn">💡 Hint</button>' +
+      '<button class="btn secondary small" id="reteach-btn">📖 Show the lesson again</button>' +
+      '<button class="btn secondary small" id="stop-btn">Finish session</button>' +
+      '</div>' +
+      '<div id="hint-slot"></div>' +
+      '</div>';
+
+    renderAnswerZone(q, function (correct) {
+      session.asked += 1;
+      if (correct) { session.correct += 1; session.combo += 1; }
+      else { session.combo = 0; session.missed = true; }
+      if (session.guidedLeft > 0) session.guidedLeft -= 1;
+
+      var pts = Engine.pointsForAnswer(lv.grade, correct, session.combo);
+      session.pointsEarned += pts;
+      Engine.addPoints(state, pts);
+
+      var justMastered = Engine.recordAnswer(state, levelId, correct);
+      if (justMastered) session.mastered = true;
+      save();
+
+      if (justMastered) { setTimeout(finishSession, 300); return; }
+      if (session.asked >= 12) { setTimeout(finishSession, 300); return; }
+      renderQuestion();
+    }, { mode: 'practice', level: lv, points: Engine.pointsForAnswer(lv.grade, true, session.combo + 1) });
+
+    $('#hint-btn').addEventListener('click', function () {
+      $('#hint-slot').innerHTML =
+        '<div class="hint-panel"><div class="lesson-h">💡 Remember</div><ol class="method-list">' +
+        lv.lesson.steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol></div>';
+      $('#hint-btn').disabled = true;
+    });
+    $('#reteach-btn').addEventListener('click', function () { renderLesson(levelId, 99); });
+    $('#stop-btn').addEventListener('click', finishSession);
+  }
+
+  // ---------- answers ----------
   function renderAnswerZone(q, onAnswered, opts) {
-    opts = opts || {};
     var zone = $('#answer-zone');
     if (q.type === 'mc') {
       zone.innerHTML = '<div class="mc-grid">' + q.choices.map(function (c, i) {
-        return '<button class="mc-choice" data-idx="' + i + '">' + esc(c) + '</button>';
+        return '<button class="mc-choice" data-i="' + i + '">' + esc(c) + '</button>';
       }).join('') + '</div><div id="feedback-slot"></div>';
       $all('.mc-choice', zone).forEach(function (btn) {
         btn.addEventListener('click', function () {
           $all('.mc-choice', zone).forEach(function (b) { b.disabled = true; });
-          var chosen = parseInt(btn.getAttribute('data-idx'), 10);
-          var correct = chosen === q.answer;
+          var correct = parseInt(btn.getAttribute('data-i'), 10) === q.answer;
           btn.classList.add(correct ? 'correct' : 'incorrect');
           if (!correct) $all('.mc-choice', zone)[q.answer].classList.add('correct');
           showFeedback(q, correct, onAnswered, opts);
@@ -248,17 +346,17 @@
     } else {
       zone.innerHTML =
         '<div class="numeric-input-row">' +
-        '<input type="text" inputmode="decimal" id="numeric-answer" placeholder="Type your answer" autocomplete="off" />' +
-        '<button class="btn" id="submit-answer-btn">Check ✓</button>' +
+        '<input type="text" inputmode="decimal" id="numeric-answer" placeholder="Your answer" autocomplete="off" />' +
+        '<button class="btn" id="submit-answer">Check ✓</button>' +
         '</div><div id="feedback-slot"></div>';
       var input = $('#numeric-answer');
-      var submit = function () {
-        var val = parseFloat((input.value || '').replace(/,/g, ''));
-        input.disabled = true; $('#submit-answer-btn').disabled = true;
-        var correct = !isNaN(val) && Math.abs(val - q.answer) <= (q.tolerance || 0.01);
-        showFeedback(q, correct, onAnswered, opts);
-      };
-      $('#submit-answer-btn').addEventListener('click', submit);
+      function submit() {
+        if (input.disabled) return;
+        var v = parseFloat((input.value || '').replace(/,/g, ''));
+        input.disabled = true; $('#submit-answer').disabled = true;
+        showFeedback(q, !isNaN(v) && Math.abs(v - q.answer) <= (q.tolerance || 0.01), onAnswered, opts);
+      }
+      $('#submit-answer').addEventListener('click', submit);
       input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
       input.focus();
     }
@@ -266,301 +364,295 @@
 
   function showFeedback(q, correct, onAnswered, opts) {
     var slot = $('#feedback-slot');
-    if (opts.quickFeedback) {
-      slot.innerHTML = '<div class="feedback-panel ' + (correct ? 'correct' : 'incorrect') + '"><div class="feedback-title">' + (correct ? '✅ Nice!' : '➡️ Noted — moving on') + '</div></div>';
+    if (opts.mode === 'placement') {
+      slot.innerHTML = '<div class="feedback-panel ' + (correct ? 'correct' : 'neutral') + '"><div class="feedback-title">' +
+        (correct ? '✅ Nice!' : '👍 Got it — noted') + '</div></div>';
       onAnswered(correct);
       return;
     }
-    var comboLine = opts.comboStreak > 1 ? '<div class="combo-flame">🔥 ' + opts.comboStreak + ' in a row!</div>' : '';
-    slot.innerHTML =
-      '<div class="feedback-panel ' + (correct ? 'correct' : 'incorrect') + '">' +
-      '<div class="feedback-title">' + (correct ? '✅ Correct!' : '❌ Not quite') + '</div>' +
-      '<div>' + esc(q.explanation) + '</div>' + comboLine +
-      '<button class="btn small mt-2" id="continue-btn">Continue →</button>' +
-      '</div>';
-    $('#continue-btn').addEventListener('click', function () { onAnswered(correct); });
+    // Practice: a miss is a teaching moment, not a scolding.
+    var lv = opts.level;
+    var hintSlot = $('#hint-slot');
+    if (hintSlot) hintSlot.innerHTML = ''; // feedback restates the method; avoid showing it twice
+    if (correct) {
+      slot.innerHTML =
+        '<div class="feedback-panel correct">' +
+        '<div class="feedback-title">✅ Correct! <span class="pts">+' + opts.points + ' 💎</span></div>' +
+        '<div>' + esc(q.explanation) + '</div>' +
+        '<button class="btn small mt-2" id="cont">Continue →</button>' +
+        '</div>';
+    } else {
+      slot.innerHTML =
+        '<div class="feedback-panel incorrect">' +
+        '<div class="feedback-title">Let\'s walk through it 🤝</div>' +
+        '<div class="worked-solution">' + esc(q.explanation) + '</div>' +
+        '<div class="reteach-note">Reminder of the method:</div>' +
+        '<ol class="method-list">' + lv.lesson.steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' +
+        '<button class="btn small mt-2" id="cont">Got it — try another →</button>' +
+        '</div>';
+    }
+    $('#cont').addEventListener('click', function () { onAnswered(correct); });
   }
 
-  // ---------- dashboard ----------
-  function renderDashboard() {
-    renderNav('dashboard');
-    var lvl = Engine.levelFor(state.lifetimePoints);
-    var weakest = Q.DOMAIN_MAP[Engine.weakestDomain(state)];
-    var goal = state.dailyGoal;
-    mainEl.innerHTML =
-      '<div class="grid" style="gap:16px;">' +
-      '<div class="card">' +
-      '<div class="section-title"><h2>Hi ' + esc(state.studentName) + '! ' + lvl.emoji + '</h2><span class="text-soft">' + lvl.title + (lvl.next ? ' · ' + lvl.pointsToNext + ' pts to ' + lvl.next.title : ' · Max level!') + '</span></div>' +
-      '<p>Today\'s goal: complete <strong>' + goal.target + ' sprint' + (goal.target > 1 ? 's' : '') + '</strong> — ' + goal.sprintsToday + '/' + goal.target + (goal.goalMet ? ' ✅ done!' : '') + '</p>' +
-      '<div class="grid grid-2">' +
-      '<div>' +
-      '<h3 style="margin-bottom:6px;">🎯 Recommended Sprint</h3>' +
-      '<p style="margin-top:0;">' + weakest.emoji + ' <strong>' + weakest.name + '</strong> needs the most love right now.</p>' +
-      '<button class="btn block" id="start-recommended-btn">Start Recommended Sprint →</button>' +
-      '</div>' +
-      '<div>' +
-      '<h3 style="margin-bottom:6px;">🗺️ Choose Your Own Adventure</h3>' +
-      '<p style="margin-top:0;">Pick any domain below to practice it directly.</p>' +
-      '</div>' +
-      '</div>' +
-      '</div>' +
-      '<div class="card"><h2>Your Mastery Map</h2>' + domainRingGrid(true) + '</div>' +
-      '<div class="card"><h2>Badges</h2>' + badgeShelf() + '</div>' +
-      squishyCollection() +
-      '</div>';
-
-    $('#start-recommended-btn').addEventListener('click', function () { startSprint(weakest.id); });
-    $all('.ring-card', mainEl).forEach(function (card) {
-      card.addEventListener('click', function () { startSprint(card.getAttribute('data-domain')); });
+  // ---------- session summary ----------
+  function finishSession() {
+    var lv = Engine.LEVEL_MAP[session.levelId];
+    var perfect = session.asked > 0 && session.correct === session.asked;
+    var dailyBonus = Engine.completeSession(state, {
+      levelId: session.levelId, correctCount: session.correct, total: session.asked,
+      pointsEarned: session.pointsEarned, mastered: session.mastered
     });
-    wireSquishies(mainEl);
-  }
+    var badges = Engine.checkBadges(state, {
+      anyCorrect: session.correct > 0,
+      newlyMastered: session.mastered ? [session.levelId] : [],
+      perfectSession: perfect,
+      sessionLength: session.asked
+    });
+    save();
 
-  // ---------- sprint ----------
-  function startSprint(domainId) {
-    sprintCtx = { domain: domainId, questions: Engine.buildSprint(state, domainId, 8), idx: 0, results: [], comboStreak: 0 };
-    renderSprintQuestion();
-  }
-
-  function renderSprintQuestion() {
-    hideNav();
-    var q = sprintCtx.questions[sprintCtx.idx];
-    var d = Q.DOMAIN_MAP[q.domain];
-    var pct = Math.round((sprintCtx.idx / sprintCtx.questions.length) * 100);
-    var diffLabel = { 1: 'Warm-Up', 2: 'On Level', 3: 'Challenge' }[q.difficulty];
-    mainEl.innerHTML =
-      '<div class="card">' +
-      '<div class="quiz-meta">' +
-      '<span>' + d.emoji + ' ' + esc(Q.SKILL_MAP[q.skill].name) + '</span>' +
-      '<span class="difficulty-pill d' + q.difficulty + '">' + diffLabel + '</span>' +
-      '<span>' + (sprintCtx.idx + 1) + ' / ' + sprintCtx.questions.length + '</span>' +
-      '</div>' +
-      '<div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:' + pct + '%; background: linear-gradient(90deg, ' + d.color + ', var(--accent-2));"></div></div>' +
-      '<div class="question-prompt">' + esc(q.prompt) + '</div>' +
-      '<div id="answer-zone"></div>' +
-      '</div>';
-
-    renderAnswerZone(q, function (correct) {
-      sprintCtx.comboStreak = correct ? sprintCtx.comboStreak + 1 : 0;
-      sprintCtx.results.push({ skill: q.skill, domain: q.domain, difficulty: q.difficulty, correct: correct });
-      sprintCtx.idx += 1;
-      if (sprintCtx.idx >= sprintCtx.questions.length) finishSprint();
-      else renderSprintQuestion();
-    }, { quickFeedback: false, comboStreak: sprintCtx.comboStreak + 1 });
-  }
-
-  function finishSprint() {
-    var summary = Engine.completeSprint(state, sprintCtx.results);
-    saveState();
-    var acc = Math.round((summary.correctCount / summary.total) * 100);
-    var masteredNames = summary.newlyMasteredSkillIds.map(function (id) { return Q.SKILL_MAP[id].name; });
+    var nextLv = Engine.nextUpLevel(state);
     hideNav();
     mainEl.innerHTML =
       '<div class="card center">' +
-      '<div class="big-emoji">' + (summary.sprintPerfect ? '💯' : acc >= 70 ? '🌟' : '💪') + '</div>' +
-      '<h1>Sprint Complete!</h1>' +
-      '<p>' + summary.correctCount + ' / ' + summary.total + ' correct (' + acc + '%)</p>' +
-      '<p style="font-size:1.3rem;font-weight:800;color:var(--accent);">+' + (summary.pointsEarned + summary.dailyBonus) + ' points earned 💎</p>' +
-      (summary.dailyBonus ? '<p>🎯 Daily goal bonus included!</p>' : '') +
-      (masteredNames.length ? ('<p>🔓 Skill' + (masteredNames.length > 1 ? 's' : '') + ' mastered: <strong>' + masteredNames.map(esc).join(', ') + '</strong> — new squishy' + (masteredNames.length > 1 ? 'ies' : '') + ' unlocked! 🧸</p>') : '') +
-      (summary.sprintPerfect ? '<p class="text-soft">Squishy-smooth — not one mistake! 🟣</p>' : '') +
+      '<div class="big-emoji">' + (session.mastered ? '🎉' : perfect ? '💯' : '💪') + '</div>' +
+      '<h1>' + (session.mastered ? 'Level Mastered!' : 'Nice work!') + '</h1>' +
+      (session.mastered ? '<p>You\'ve got <strong>' + esc(lv.name) + '</strong> down — ' + Engine.MASTERY_STREAK + ' correct in a row. A new squishy joined your collection! 🧸</p>'
+        : '<p>' + session.correct + ' of ' + session.asked + ' correct on <strong>' + esc(lv.name) + '</strong>. Keep going and you\'ll master it.</p>') +
+      '<p style="font-size:1.3rem;font-weight:800;color:var(--accent);">+' + (session.pointsEarned + dailyBonus) + ' points 💎</p>' +
+      (dailyBonus ? '<p>🎯 Daily goal bonus included!</p>' : '') +
+      (nextLv ? '<p class="text-soft">Up next: ' + esc(nextLv.name) + ' ' + gradeChip(nextLv.grade) + '</p>' : '') +
       '<div class="grid grid-2 mt-2">' +
-      '<button class="btn" id="another-sprint-btn">Do Another Sprint →</button>' +
-      '<button class="btn secondary" id="back-dashboard-btn">Back to Dashboard</button>' +
-      '</div>' +
-      '</div>';
-    $('#another-sprint-btn').addEventListener('click', function () { startSprint(sprintCtx.domain); });
-    $('#back-dashboard-btn').addEventListener('click', function () { go('dashboard'); });
+      (nextLv ? '<button class="btn" id="next-btn">' + (session.mastered ? 'Next Lesson →' : 'Keep Practicing →') + '</button>' : '') +
+      '<button class="btn secondary" id="home-btn">Back to Home</button>' +
+      '</div></div>';
 
-    if (summary.newlyMasteredSkillIds.length || summary.newBadges.length || summary.sprintPerfect) {
-      confettiBurst();
+    if (session.mastered || badges.length) confetti();
+    if (badges.length) announce(badges);
+
+    if (nextLv) {
+      $('#next-btn').addEventListener('click', function () {
+        startLevel(session.mastered ? nextLv.id : session.levelId);
+      });
     }
-    if (summary.newBadges.length) setTimeout(function () { announceBadges(summary.newBadges); }, 300);
+    $('#home-btn').addEventListener('click', function () { go('dashboard'); });
   }
 
-  function announceBadges(badges) {
+  function announce(badges) {
     badges.forEach(function (b, i) {
-      setTimeout(function () { toast('🏅 Badge earned: ' + b.name + ' (+' + b.bonus + ' pts)'); }, i * 900);
+      setTimeout(function () { toast('🏅 ' + b.name + ' (+' + b.bonus + ')'); }, i * 900);
     });
   }
 
-  // ---------- progress report ----------
-  function renderProgress() {
-    renderNav('progress');
-    var rows = Q.SKILLS.map(function (s) {
-      var sk = state.skills[s.id];
-      var d = Q.DOMAIN_MAP[s.domain];
-      var st = statusForMastery(sk.mastery);
-      var acc = sk.attempts ? Math.round((sk.correct / sk.attempts) * 100) : 0;
-      return '<tr>' +
-        '<td>' + d.emoji + ' ' + esc(d.short) + '</td>' +
-        '<td>' + esc(s.name) + '</td>' +
-        '<td><span class="mastery-bar-bg"><span class="mastery-bar-fill" style="width:' + sk.mastery + '%;background:' + d.color + '"></span></span>' + sk.mastery + '%</td>' +
-        '<td><span class="status-pill ' + st.cls + '">' + st.label + '</span></td>' +
-        '<td>' + sk.attempts + ' (' + acc + '% correct)</td>' +
-        '<td>' + (sk.lastPracticed || '—') + '</td>' +
-        '</tr>';
+  // ---------- skill map ----------
+  function renderMap() {
+    renderNav('map');
+    var html = C.STRANDS.map(function (s) {
+      var levels = Engine.strandLevels(s.id);
+      var items = levels.map(function (lv) {
+        var ls = state.levels[lv.id];
+        var status = ls.masteredAt ? 'done' : Engine.isUnlocked(state, lv.id) ? 'current' : 'locked';
+        var icon = status === 'done' ? '✅' : status === 'current' ? '📚' : '🔒';
+        var note = status === 'done'
+          ? (ls.placedByDiagnostic ? 'already knew it' : 'mastered')
+          : status === 'current' ? (ls.streak + ' / ' + Engine.MASTERY_STREAK + ' in a row') : 'unlocks after the one above';
+        return '<div class="map-level ' + status + '" data-level="' + lv.id + '">' +
+          '<span class="map-icon">' + icon + '</span>' +
+          '<span class="map-name">' + esc(lv.name) + ' ' + gradeChip(lv.grade) + '</span>' +
+          '<span class="map-note">' + note + '</span>' +
+          '</div>';
+      }).join('');
+      return '<div class="card mt-2"><h3>' + s.emoji + ' ' + esc(s.name) + '</h3>' + items + '</div>';
     }).join('');
-    mainEl.innerHTML =
-      '<div class="card">' +
-      '<h2>Progress Report</h2>' +
-      '<p>Every skill across all 5 Grade 7 math domains, updated live as ' + esc(state.studentName) + ' practices.</p>' +
-      '<div style="overflow-x:auto;"><table class="report"><thead><tr><th>Domain</th><th>Skill</th><th>Mastery</th><th>Status</th><th>Attempts</th><th>Last practiced</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-      '</div>';
+    mainEl.innerHTML = '<div class="card"><h2>🗺️ Skill Map</h2><p>Every level from Grade 4 to Grade 7. You unlock each one by mastering the one before it — tap the one with 📚 to work on it.</p></div>' + html;
+    $all('.map-level.current', mainEl).forEach(function (el) {
+      el.addEventListener('click', function () { startLevel(el.getAttribute('data-level')); });
+    });
   }
 
-  // ---------- rewards shop ----------
+  // ---------- squishies ----------
+  var BLOBS = ['42% 58% 63% 37% / 41% 44% 56% 59%', '58% 42% 35% 65% / 55% 40% 60% 45%', '65% 35% 46% 54% / 35% 60% 40% 65%', '40% 60% 55% 45% / 60% 35% 65% 40%', '55% 45% 40% 60% / 45% 60% 35% 65%'];
+  var BOOPS = ['Squish squish! 🟣', 'Boop!', '*squoosh*', 'Ooh, satisfying.', 'Neeeee-doh!'];
+
+  function squishyCollection() {
+    var earned = C.LEVELS.filter(function (l) { return state.levels[l.id].masteredAt; }).length;
+    var cells = C.LEVELS.map(function (lv, i) {
+      var s = Engine.STRAND_MAP[lv.strand];
+      var got = !!state.levels[lv.id].masteredAt;
+      var style = 'border-radius:' + BLOBS[i % BLOBS.length] + (got ? ';background:' + s.color : '');
+      return '<div class="squishy-cell">' +
+        '<div class="squishy ' + (got ? 'unlocked' : 'locked') + '" data-squishy="' + lv.id + '" style="' + style + '" title="' + esc(got ? lv.name + ' — collected!' : 'Master ' + lv.name + ' to unlock') + '">' +
+        (got ? '' : '<span class="squishy-lock">🔒</span>') + '</div></div>';
+    }).join('');
+    return '<div class="card"><div class="section-title"><h2>🧸 Squish Collection</h2><span class="text-soft">' + earned + ' / ' + C.LEVELS.length + '</span></div>' +
+      '<p>Master a level, earn a squishy.</p><div class="squishy-grid">' + cells + '</div></div>';
+  }
+
+  function wireSquishies(ctx) {
+    $all('.squishy.unlocked', ctx).forEach(function (el) {
+      el.addEventListener('click', function () {
+        el.classList.remove('squish-pop'); void el.offsetWidth; el.classList.add('squish-pop');
+      });
+    });
+    $all('.squishy.locked', ctx).forEach(function (el) {
+      el.addEventListener('click', function () { toast('Master that level to unlock its squishy! 🔒'); });
+    });
+  }
+
+  function badgeShelf() {
+    return '<div class="badge-shelf">' + Engine.BADGES.map(function (b) {
+      var got = state.badges.indexOf(b.id) !== -1;
+      return '<div class="badge-pill' + (got ? '' : ' locked') + '" title="' + esc(b.desc) + '"><span class="emoji">' + b.emoji + '</span> ' + esc(b.name) + '</div>';
+    }).join('') + '</div>';
+  }
+
+  // ---------- rewards ----------
   function renderRewards() {
     renderNav('rewards');
     var cards = state.rewards.slice().sort(function (a, b) { return a.cost - b.cost; }).map(function (r) {
-      var afford = state.points >= r.cost;
-      return '<div class="card reward-card">' +
-        '<div><div class="name">' + esc(r.name) + '</div><div class="cost">💎 ' + r.cost + ' points</div></div>' +
-        '<button class="btn small' + (afford ? '' : ' secondary') + '" data-reward="' + r.id + '" ' + (afford ? '' : 'disabled') + '>Redeem</button>' +
-        '</div>';
+      var ok = state.points >= r.cost;
+      return '<div class="card reward-card"><div><div class="name">' + esc(r.name) + '</div><div class="cost">💎 ' + r.cost + '</div></div>' +
+        '<button class="btn small' + (ok ? '' : ' secondary') + '" data-reward="' + r.id + '"' + (ok ? '' : ' disabled') + '>Redeem</button></div>';
     }).join('');
-    var history = state.redemptions.slice(0, 8).map(function (r) {
-      return '<li>' + esc(r.date) + ' — ' + esc(r.rewardName) + ' (' + r.cost + ' pts)' + (r.fulfilled ? ' ✅' : ' ⏳ waiting on a grown-up') + '</li>';
+    var hist = state.redemptions.slice(0, 8).map(function (r) {
+      return '<li>' + esc(r.date) + ' — ' + esc(r.rewardName) + ' (' + r.cost + ')' + (r.fulfilled ? ' ✅' : ' ⏳') + '</li>';
     }).join('');
     mainEl.innerHTML =
-      '<div class="card"><h2>🎁 Rewards Shop</h2><p>You have <strong>💎 ' + state.points + ' points</strong> to spend. Redeeming lets a grown-up know it\'s time to deliver!</p></div>' +
+      '<div class="card"><h2>🎁 Rewards Shop</h2><p>You have <strong>💎 ' + state.points + '</strong> to spend.</p></div>' +
       '<div class="grid grid-2 mt-2">' + cards + '</div>' +
-      '<div class="card mt-2"><h3>Redemption History</h3>' + (history ? '<ul>' + history + '</ul>' : '<p class="text-soft">No redemptions yet — go earn some points!</p>') + '</div>';
-    $all('[data-reward]', mainEl).forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var res = Engine.redeemReward(state, btn.getAttribute('data-reward'));
-        if (res.ok) { saveState(); toast('🎉 Redeemed: ' + res.redemption.rewardName); renderRewards(); }
-        else toast(res.message);
+      '<div class="card mt-2"><h3>History</h3>' + (hist ? '<ul>' + hist + '</ul>' : '<p class="text-soft">Nothing yet.</p>') + '</div>';
+    $all('[data-reward]', mainEl).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var r = Engine.redeemReward(state, b.getAttribute('data-reward'));
+        if (r.ok) { save(); toast('🎉 Redeemed: ' + r.redemption.rewardName); renderRewards(); }
+        else toast(r.message);
       });
     });
   }
 
-  // ---------- parent zone ----------
+  // ---------- parent ----------
   function renderParentGate() {
     renderNav('parent');
-    mainEl.innerHTML =
-      '<div class="card parent-gate">' +
-      '<div class="big-emoji">👪</div>' +
-      '<h2>Parent Zone</h2>' +
-      '<p>Manage rewards, review progress details, and fulfill redemption requests.</p>' +
-      '<button class="btn" id="enter-parent-btn">Enter Parent Zone</button>' +
-      '</div>';
-    $('#enter-parent-btn').addEventListener('click', renderParentPanel);
+    mainEl.innerHTML = '<div class="card parent-gate"><div class="big-emoji">👪</div><h2>Parent Zone</h2>' +
+      '<p>See exactly where the gaps are, manage rewards, and handle redemptions.</p>' +
+      '<button class="btn" id="enter">Enter Parent Zone</button></div>';
+    $('#enter').addEventListener('click', renderParentPanel);
   }
 
   function renderParentPanel() {
-    var rewardRows = state.rewards.map(function (r) {
-      return '<div class="form-row" style="align-items:center;">' +
-        '<span style="flex:1;">' + esc(r.name) + ' — 💎 ' + r.cost + '</span>' +
-        '<button class="btn small danger" data-del-reward="' + r.id + '">Remove</button>' +
-        '</div>';
+    var gapRows = C.STRANDS.map(function (s) {
+      var kg = Engine.knowledgeGrade(state, s.id);
+      var cur = Engine.currentLevel(state, s.id);
+      var p = Engine.strandProgress(state, s.id);
+      return '<tr><td>' + s.emoji + ' ' + esc(s.name) + '</td>' +
+        '<td>' + (kg ? 'Grade ' + kg : '<span style="color:var(--danger)">below Grade 4</span>') + '</td>' +
+        '<td>' + p.done + '/' + p.total + '</td>' +
+        '<td>' + (cur ? esc(cur.name) + ' (G' + cur.grade + ')' : '✅ complete') + '</td></tr>';
     }).join('');
-    var redemptionRows = state.redemptions.map(function (r) {
-      return '<div class="form-row" style="align-items:center;">' +
-        '<span style="flex:1;">' + esc(r.date) + ' — ' + esc(r.rewardName) + ' (' + r.cost + ' pts) ' + (r.fulfilled ? '✅ fulfilled' : '⏳ pending') + '</span>' +
-        (r.fulfilled ? '' : '<button class="btn small success" data-fulfill="' + r.id + '">Mark Fulfilled</button>') +
-        '</div>';
-    }).join('') || '<p class="text-soft">No redemptions yet.</p>';
+
+    var detail = C.LEVELS.map(function (lv) {
+      var ls = state.levels[lv.id];
+      var acc = ls.attempts ? Math.round((ls.correct / ls.attempts) * 100) + '%' : '—';
+      var status = ls.masteredAt ? (ls.placedByDiagnostic ? 'Placed (already knew)' : 'Mastered') : Engine.isUnlocked(state, lv.id) ? 'Working on it' : 'Locked';
+      return '<tr><td>G' + lv.grade + '</td><td>' + esc(lv.name) + '</td><td>' + status + '</td><td>' + ls.attempts + '</td><td>' + acc + '</td></tr>';
+    }).join('');
+
+    var rewardRows = state.rewards.map(function (r) {
+      return '<div class="form-row" style="align-items:center;"><span style="flex:1;">' + esc(r.name) + ' — 💎 ' + r.cost + '</span>' +
+        '<button class="btn small danger" data-del="' + r.id + '">Remove</button></div>';
+    }).join('');
+
+    var redeems = state.redemptions.map(function (r) {
+      return '<div class="form-row" style="align-items:center;"><span style="flex:1;">' + esc(r.date) + ' — ' + esc(r.rewardName) + (r.fulfilled ? ' ✅' : ' ⏳') + '</span>' +
+        (r.fulfilled ? '' : '<button class="btn small success" data-ful="' + r.id + '">Mark Fulfilled</button>') + '</div>';
+    }).join('') || '<p class="text-soft">None yet.</p>';
 
     mainEl.innerHTML =
-      '<div class="card">' +
-      '<h2>Manage Rewards</h2>' +
-      '<div class="form-row"><input type="text" id="new-reward-name" placeholder="Reward name" style="flex:2;"><input type="number" id="new-reward-cost" placeholder="Cost (points)" style="flex:1;"><button class="btn" id="add-reward-btn">Add</button></div>' +
-      rewardRows +
-      '</div>' +
-      '<div class="card mt-2"><h2>Redemption Requests</h2>' + redemptionRows + '</div>' +
-      '<div class="card mt-2"><h2>Daily Goal</h2>' +
-      '<div class="form-row"><label>Sprints per day: <input type="number" id="daily-target" value="' + state.dailyGoal.target + '" min="1" max="10" style="width:60px;"></label><button class="btn small" id="save-goal-btn">Save</button></div>' +
-      '</div>' +
-      '<div class="card mt-2"><h2>Backup & Transfer</h2><p class="text-soft">Progress is saved only on this device/browser. Download a backup to move it to another iPad or iPhone, or just to keep a safety copy.</p>' +
-      '<div class="form-row"><button class="btn small" id="export-btn">⬇️ Download Backup</button><label class="btn small secondary" for="import-file" style="cursor:pointer;">⬆️ Restore From Backup<input type="file" id="import-file" accept="application/json" style="display:none;"></label></div>' +
-      '</div>' +
-      '<div class="card mt-2"><h2>Danger Zone</h2><p class="text-soft">This clears all progress, points, and badges. Cannot be undone.</p><button class="btn danger" id="reset-btn">Reset All Progress</button></div>';
+      '<div class="card"><h2>📊 Where She Actually Is</h2>' +
+      '<p>"Knowledge grade" is the highest grade level fully mastered in that strand. Anything below Grade 7 is a gap the app is actively teaching.</p>' +
+      '<div style="overflow-x:auto"><table class="report"><thead><tr><th>Strand</th><th>Knowledge grade</th><th>Mastered</th><th>Currently teaching</th></tr></thead><tbody>' + gapRows + '</tbody></table></div></div>' +
 
-    $('#add-reward-btn').addEventListener('click', function () {
-      var name = $('#new-reward-name').value.trim();
-      var cost = parseInt($('#new-reward-cost').value, 10);
-      if (!name || !cost || cost <= 0) { toast('Enter a name and a positive point cost.'); return; }
-      state.rewards.push({ id: 'r_' + Date.now(), name: name, cost: cost });
-      saveState(); renderParentPanel();
+      '<div class="card mt-2"><h3>Every Level</h3><div style="overflow-x:auto"><table class="report"><thead><tr><th>Gr</th><th>Level</th><th>Status</th><th>Tries</th><th>Accuracy</th></tr></thead><tbody>' + detail + '</tbody></table></div></div>' +
+
+      '<div class="card mt-2"><h3>Rewards</h3>' +
+      '<div class="form-row"><input type="text" id="rw-name" placeholder="Reward name" style="flex:2;"><input type="number" id="rw-cost" placeholder="Points" style="flex:1;"><button class="btn" id="rw-add">Add</button></div>' + rewardRows + '</div>' +
+
+      '<div class="card mt-2"><h3>Redemption Requests</h3>' + redeems + '</div>' +
+
+      '<div class="card mt-2"><h3>Daily Goal</h3><div class="form-row"><label>Sessions per day: <input type="number" id="goal" value="' + state.dailyGoal.target + '" min="1" max="10" style="width:60px;"></label><button class="btn small" id="goal-save">Save</button></div></div>' +
+
+      '<div class="card mt-2"><h3>Backup & Transfer</h3><p class="text-soft">Progress saves on this device only. Move it between her iPad and iPhone here.</p>' +
+      '<div class="form-row"><button class="btn small" id="export">⬇️ Download Backup</button>' +
+      '<label class="btn small secondary" for="import" style="cursor:pointer;">⬆️ Restore<input type="file" id="import" accept="application/json" style="display:none;"></label></div></div>' +
+
+      '<div class="card mt-2"><h3>Danger Zone</h3><p class="text-soft">Clears all progress and re-runs placement.</p><button class="btn danger" id="reset">Reset All Progress</button></div>';
+
+    $('#rw-add').addEventListener('click', function () {
+      var n = $('#rw-name').value.trim(), c = parseInt($('#rw-cost').value, 10);
+      if (!n || !c || c <= 0) return toast('Enter a name and a point cost.');
+      state.rewards.push({ id: 'r_' + Date.now(), name: n, cost: c });
+      save(); renderParentPanel();
     });
-    $all('[data-del-reward]', mainEl).forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        state.rewards = state.rewards.filter(function (r) { return r.id !== btn.getAttribute('data-del-reward'); });
-        saveState(); renderParentPanel();
+    $all('[data-del]', mainEl).forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.rewards = state.rewards.filter(function (r) { return r.id !== b.getAttribute('data-del'); });
+        save(); renderParentPanel();
       });
     });
-    $all('[data-fulfill]', mainEl).forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var r = state.redemptions.find(function (x) { return x.id === btn.getAttribute('data-fulfill'); });
+    $all('[data-ful]', mainEl).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var r = state.redemptions.find(function (x) { return x.id === b.getAttribute('data-ful'); });
         if (r) r.fulfilled = true;
-        saveState(); renderParentPanel();
+        save(); renderParentPanel();
       });
     });
-    $('#save-goal-btn').addEventListener('click', function () {
-      var t = parseInt($('#daily-target').value, 10);
-      if (t && t > 0) { state.dailyGoal.target = t; saveState(); toast('Daily goal updated.'); }
+    $('#goal-save').addEventListener('click', function () {
+      var t = parseInt($('#goal').value, 10);
+      if (t > 0) { state.dailyGoal.target = t; save(); toast('Saved.'); }
     });
-    $('#reset-btn').addEventListener('click', function () {
-      if (confirm('Reset ALL progress, points, and badges? This cannot be undone.')) {
-        state = Storage.reset();
-        saveState();
-        renderWelcome();
-      }
-    });
-    $('#export-btn').addEventListener('click', function () {
-      var data = JSON.stringify(state, null, 2);
-      var blob = new Blob([data], { type: 'application/json' });
+    $('#export').addEventListener('click', function () {
+      var blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      a.href = url;
-      a.download = 'meital-math-quest-backup-' + Storage.todayStr() + '.json';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      a.href = url; a.download = 'meital-math-backup-' + Storage.todayStr() + '.json';
+      document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
       toast('Backup downloaded.');
     });
-    $('#import-file').addEventListener('change', function (e) {
-      var file = e.target.files[0];
-      if (!file) return;
+    $('#import').addEventListener('change', function (e) {
+      var f = e.target.files[0];
+      if (!f) return;
       var reader = new FileReader();
       reader.onload = function () {
         try {
-          var imported = JSON.parse(reader.result);
-          if (!imported || typeof imported !== 'object' || !imported.skills) throw new Error('Not a valid backup file.');
-          if (!confirm('Replace current progress with this backup? This cannot be undone.')) return;
-          state = imported;
-          saveState();
-          renderParentPanel();
-          toast('Backup restored.');
-        } catch (err) {
-          toast('Could not read that backup file.');
-        }
+          var data = JSON.parse(reader.result);
+          if (!data || !data.levels) throw new Error('bad file');
+          if (!confirm('Replace current progress with this backup?')) return;
+          state = data; save(); renderParentPanel(); toast('Restored.');
+        } catch (err) { toast('Could not read that backup.'); }
         e.target.value = '';
       };
-      reader.readAsText(file);
+      reader.readAsText(f);
+    });
+    $('#reset').addEventListener('click', function () {
+      if (confirm('Reset ALL progress? This cannot be undone.')) {
+        state = Storage.reset(); save(); renderWelcome();
+      }
     });
   }
 
   // ---------- init ----------
   function init() {
-    mainEl = $('#app-main');
-    navEl = $('#app-nav');
-    headerStatsEl = $('#header-stats');
+    mainEl = $('#app-main'); navEl = $('#app-nav'); headerStatsEl = $('#header-stats');
     state = Storage.load();
     updateHeaderStats();
     var mascot = $('#squish-mascot');
     if (mascot) {
       mascot.addEventListener('click', function () {
-        mascot.classList.remove('squish-pop');
-        void mascot.offsetWidth;
-        mascot.classList.add('squish-pop');
-        toast(BOOP_MESSAGES[Math.floor(Math.random() * BOOP_MESSAGES.length)]);
+        mascot.classList.remove('squish-pop'); void mascot.offsetWidth; mascot.classList.add('squish-pop');
+        toast(BOOPS[Math.floor(Math.random() * BOOPS.length)]);
       });
     }
-    if (!state.diagnosticDone) renderWelcome();
-    else renderDashboard();
+    if (!state.diagnosticDone) renderWelcome(); else renderDashboard();
   }
 
   root.App = root.App || {};
